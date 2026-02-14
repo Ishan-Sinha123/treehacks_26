@@ -1,0 +1,49 @@
+services:
+  # Elasticsearch Private Service
+  - type: pserv
+    name: zoom-elasticsearch
+    env: docker
+    dockerfilePath: ./elasticsearch/Dockerfile
+    disk:
+      name: elasticsearch-data
+      mountPath: /usr/share/elasticsearch/data
+      sizeGB: 10
+    envVars:
+      - key: discovery.type
+        value: single-node
+      - key: xpack.security.enabled
+        value: "false"
+      - key: ES_JAVA_OPTS
+        value: "-Xms512m -Xmx512m"
+      - key: bootstrap.memory_lock
+        value: "false"
+
+  # Main Express Web Service
+  - type: web
+    name: zoom-context-app
+    env: node
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: ELASTICSEARCH_URL
+        value: http://zoom-elasticsearch:9200
+      - key: ZM_CLIENT_ID
+        sync: false
+      - key: ZM_CLIENT_SECRET
+        sync: false
+      - key: ZM_REDIRECT_URL
+        sync: false
+      - key: ZM_HOST
+        value: https://zoom.us
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: APP_NAME
+        value: zoom-context-assistant
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: JINA_API_KEY
+        sync: false

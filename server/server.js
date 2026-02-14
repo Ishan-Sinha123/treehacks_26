@@ -1,6 +1,7 @@
 import http from 'http';
 import debug from 'debug';
 import { appName } from '../config.js';
+import { testConnection, initializeIndices } from './helpers/elasticsearch.js';
 
 const dbg = debug(`${appName}:http`);
 
@@ -10,6 +11,20 @@ const dbg = debug(`${appName}:http`);
  * @param {String|number} port - local TCP port to serve from
  */
 export async function start(app, port) {
+    // Initialize Elasticsearch before starting server
+    console.log('🔄 Connecting to Elasticsearch...');
+    const connected = await testConnection();
+
+    if (connected) {
+        console.log('🔄 Initializing Elasticsearch indices...');
+        await initializeIndices();
+        console.log('✅ Elasticsearch ready');
+    } else {
+        console.warn(
+            '⚠️  Elasticsearch not available - some features will be disabled'
+        );
+    }
+
     // Create HTTP server
     const server = http.createServer(app);
 
@@ -25,9 +40,7 @@ export async function start(app, port) {
 
     server.on('error', async (error) => {
         if (error?.syscall !== 'listen') throw error;
-
         const bind = typeof port === 'string' ? `Pipe ${port}` : `Port ${port}`;
-
         // handle specific listen errors with friendly messages
         switch (error?.code) {
             case 'EACCES':
