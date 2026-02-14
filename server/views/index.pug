@@ -3,11 +3,12 @@ include mixins/prompt-install
 
 block content
     if isZoom
-        .hidden#main
+        #main
             h1= title
             button#toggle-view Start
    
-        canvas#immersive-canvas
+        .hidden#immersive
+            canvas#immersive-canvas
     else
         +prompt-install(title, installURL)
 

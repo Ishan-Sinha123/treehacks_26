@@ -1,16 +1,14 @@
 import zoomSdk from '@zoom/appssdk';
 
-// State management.
-let isImmersiveActive = false;
+// State
 let participants = [];
-let canvasContext = null;
 
-// Get components.
-const content = document.getElementById('main');
+// Get components
+const mainContent = document.getElementById('main');
 const toggleButton = document.getElementById('toggle-view');
-const canvas = document.getElementById('immersive-canvas');
-const ctx = canvas.getContext('2d');
+const immersiveContainer = document.getElementById('immersive');
 
+// Initialize app
 (async () => {
     try {
         const configResponse = await zoomSdk.config({
@@ -23,8 +21,6 @@ const ctx = canvas.getContext('2d');
                 'clearParticipant',
                 'getMeetingParticipants',
                 'getUserContext',
-                'sendAppInvitationToAllParticipants',
-                'onSendAppInvitation',
                 'onParticipantChange',
             ],
         });
@@ -32,239 +28,109 @@ const ctx = canvas.getContext('2d');
         console.debug('Zoom JS SDK Configuration', configResponse);
 
         const { runningContext } = configResponse;
+
         if (runningContext === 'inMeeting') {
+            // SIDEBAR MODE
             await zoomSdk.callZoomApi('startRTMS');
 
-            // Check user role and setup immersive view for host
             const userContext = await zoomSdk.getUserContext();
-            const { role } = userContext;
-
-            // Show the toggle button for the host.
-            if (role === 'host') {
+            if (userContext.role === 'host') {
                 toggleButton.classList.remove('hidden');
+                toggleButton.addEventListener('click', startImmersiveView);
             }
+        } else if (runningContext === 'inImmersive') {
+            // IMMERSIVE MODE
+            mainContent.classList.add('hidden');
+            immersiveContainer.classList.remove('hidden');
+
+            // Get and draw participants
+            const response = await zoomSdk.getMeetingParticipants();
+            participants = response.participants || [];
+            console.log('Participants in immersive mode:', participants);
+            await drawParticipants();
+
+            // Listen for participant changes
+            zoomSdk.onParticipantChange(handleParticipantChange);
+
+            // Handle resize
+            window.addEventListener('resize', handleResize);
         }
     } catch (e) {
-        console.error(e);
+        console.error('Error initializing app:', e);
     }
 })();
 
 /**
- * Setup immersive view controls and event listeners (host only)
- */
-function setupImmersiveView() {
-    const toggleButton = document.getElementById('toggle-immersive');
-    const canvas = document.getElementById('immersive-canvas');
-
-    if (!toggleButton || !canvas) {
-        console.error('Required elements not found');
-        return;
-    }
-
-    // Setup button click handler
-    toggleButton.addEventListener('click', handleToggleImmersive);
-
-    // Listen for participant changes
-    zoomSdk.onParticipantChange(handleParticipantChange);
-
-    // Handle window resize
-    window.addEventListener('resize', () => {
-        if (isImmersiveActive) {
-            setupCanvas();
-            drawParticipants();
-        }
-    });
-}
-
-/**
- * Toggle immersive view on/off
- */
-async function handleToggleImmersive() {
-    const toggleButton = document.getElementById('toggle-immersive');
-    toggleButton.disabled = true;
-
-    try {
-        if (isImmersiveActive) {
-            await stopImmersiveView();
-        } else {
-            await startImmersiveView();
-        }
-    } catch (error) {
-        console.error('Error toggling immersive view:', error);
-        showError(error.message || 'Failed to toggle immersive view');
-    } finally {
-        toggleButton.disabled = false;
-    }
-}
-
-/**
- * Start immersive view mode
+ * Start immersive view from sidebar
  */
 async function startImmersiveView() {
     try {
-        // Start rendering context
         await zoomSdk.runRenderingContext({ view: 'immersive' });
-        console.log('Rendering context started');
-
-        // Get meeting participants
-        const participantsResponse = await zoomSdk.getMeetingParticipants();
-        participants = participantsResponse.participants || [];
-        console.log('Participants:', participants);
-
-        // Setup canvas
-        setupCanvas();
-
-        // Draw participants
-        drawParticipants();
-
-        // Send invitations to all participants
-        try {
-            const invitationResponse =
-                await zoomSdk.sendAppInvitationToAllParticipants();
-            console.log('Invitation sent:', invitationResponse.invitationUUID);
-        } catch (inviteError) {
-            console.warn('Could not send invitations:', inviteError);
-            // Don't fail the whole operation if invitations fail
-        }
-
-        // Update UI state
-        isImmersiveActive = true;
-        const toggleButton = document.getElementById('toggle-immersive');
-        const canvas = document.getElementById('immersive-canvas');
-
-        toggleButton.textContent = 'Stop Immersive View';
-        toggleButton.classList.add('active');
-        canvas.style.display = 'block';
-        document.body.classList.add('immersive-active');
+        console.log('Starting immersive view - app will reload');
+        // App will reload in 'inImmersive' context
     } catch (error) {
         console.error('Failed to start immersive view:', error);
-        throw error;
     }
 }
 
 /**
- * Stop immersive view mode
+ * Stop immersive view (optional - can be called from console or exit button)
  */
 async function stopImmersiveView() {
     try {
-        // Clear all participants
-        await clearAllParticipants();
-
-        // Close rendering context
         await zoomSdk.closeRenderingContext();
-        console.log('Rendering context closed');
-
-        // Update UI state
-        isImmersiveActive = false;
-        const toggleButton = document.getElementById('toggle-immersive');
-        const canvas = document.getElementById('immersive-canvas');
-
-        toggleButton.textContent = 'Start Immersive View';
-        toggleButton.classList.remove('active');
-        canvas.style.display = 'none';
-        document.body.classList.remove('immersive-active');
-
-        participants = [];
+        console.log('Closing immersive view - app will return to sidebar');
+        // App will return to 'inMeeting' context
     } catch (error) {
         console.error('Failed to stop immersive view:', error);
-        throw error;
     }
 }
 
 /**
- * Setup canvas with proper dimensions and device pixel ratio
- */
-function setupCanvas() {
-    const canvas = document.getElementById('immersive-canvas');
-    if (!canvas) return;
-
-    const dpr = window.devicePixelRatio || 1;
-    canvas.width = window.innerWidth * dpr;
-    canvas.height = window.innerHeight * dpr;
-    canvas.style.width = `${window.innerWidth}px`;
-    canvas.style.height = `${window.innerHeight}px`;
-
-    canvasContext = canvas.getContext('2d');
-    if (canvasContext) {
-        canvasContext.scale(dpr, dpr);
-    }
-}
-
-/**
- * Draw participants in a centered grid layout
+ * Draw participants in 2x2 grid (up to 4 participants)
  */
 async function drawParticipants() {
-    if (!participants || participants.length === 0) {
-        console.log('No participants to draw');
-        return;
+    // Clear existing participants first
+    for (const p of participants) {
+        try {
+            await zoomSdk.clearParticipant({ participantUUID: p.participantUUID });
+        } catch (error) {
+            console.error(`Failed to clear participant ${p.screenName}:`, error);
+        }
     }
 
-    // Clear existing participants first
-    await clearAllParticipants();
+    // Calculate positions for 2x2 grid
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+    const halfWidth = width / 2;
+    const halfHeight = height / 2;
 
-    // Layout configuration
-    const squareSize = 400;
-    const participantSize = 120;
-    const spacing = 10;
-    const participantWithSpacing = participantSize + spacing;
+    // Define 4 quadrant positions
+    const positions = [
+        { x: 0, y: 0 },                    // Top-left
+        { x: halfWidth, y: 0 },            // Top-right
+        { x: 0, y: halfHeight },           // Bottom-left
+        { x: halfWidth, y: halfHeight }    // Bottom-right
+    ];
 
-    // Calculate grid dimensions
-    const cols = Math.ceil(Math.sqrt(participants.length));
-    // const rows = Math.ceil(participants.length / cols);
-
-    // Calculate centered position
-    const viewportWidth = window.innerWidth;
-    const viewportHeight = window.innerHeight;
-    const startX = (viewportWidth - squareSize) / 2;
-    const startY = (viewportHeight - squareSize) / 2;
-
-    // Draw each participant
-    for (let i = 0; i < participants.length; i++) {
-        const participant = participants[i];
-        const col = i % cols;
-        const row = Math.floor(i / cols);
-
-        const x = startX + col * participantWithSpacing;
-        const y = startY + row * participantWithSpacing;
+    // Draw up to 4 participants
+    const displayParticipants = participants.slice(0, 4);
+    for (let i = 0; i < displayParticipants.length; i++) {
+        const participant = displayParticipants[i];
+        const pos = positions[i];
 
         try {
             await zoomSdk.drawParticipant({
                 participantUUID: participant.participantUUID,
-                x: Math.round(x),
-                y: Math.round(y),
-                width: participantSize,
-                height: participantSize,
-                zIndex: 1,
+                x: Math.round(pos.x),
+                y: Math.round(pos.y),
+                width: Math.round(halfWidth),
+                height: Math.round(halfHeight),
+                zIndex: 1
             });
-            console.log(
-                `Drew participant: ${
-                    participant.screenName || participant.participantUUID
-                }`
-            );
+            console.log(`Drew participant: ${participant.screenName || participant.participantUUID} at position ${i}`);
         } catch (error) {
-            console.error(
-                `Failed to draw participant ${participant.screenName}:`,
-                error
-            );
-            // Continue with other participants
-        }
-    }
-}
-
-/**
- * Clear all drawn participants
- */
-async function clearAllParticipants() {
-    for (const participant of participants) {
-        try {
-            await zoomSdk.clearParticipant({
-                participantUUID: participant.participantUUID,
-            });
-        } catch (error) {
-            console.error(
-                `Failed to clear participant ${participant.screenName}:`,
-                error
-            );
+            console.error(`Failed to draw participant ${participant.screenName}:`, error);
         }
     }
 }
@@ -273,16 +139,11 @@ async function clearAllParticipants() {
  * Handle participant changes (join/leave)
  */
 async function handleParticipantChange(event) {
-    if (!isImmersiveActive) return;
-
     console.log('Participant change detected:', event);
 
     try {
-        // Re-fetch participant list
-        const participantsResponse = await zoomSdk.getMeetingParticipants();
-        participants = participantsResponse.participants || [];
-
-        // Redraw participants with new layout
+        const response = await zoomSdk.getMeetingParticipants();
+        participants = response.participants || [];
         await drawParticipants();
     } catch (error) {
         console.error('Failed to handle participant change:', error);
@@ -290,26 +151,9 @@ async function handleParticipantChange(event) {
 }
 
 /**
- * Show error notification to user
+ * Handle window resize
  */
-function showError(message) {
-    const errorDiv = document.createElement('div');
-    errorDiv.textContent = message;
-    errorDiv.style.cssText = `
-        position: fixed;
-        top: 20px;
-        right: 20px;
-        background-color: #f44336;
-        color: white;
-        padding: 16px;
-        border-radius: 4px;
-        z-index: 10000;
-        max-width: 300px;
-    `;
-
-    document.body.appendChild(errorDiv);
-
-    setTimeout(() => {
-        errorDiv.remove();
-    }, 5000);
+async function handleResize() {
+    console.log('Window resized, redrawing participants');
+    await drawParticipants();
 }

@@ -1,50 +1,51 @@
-body {
-  padding: 50px;
-  font: 14px "Lucida Grande", Helvetica, Arial, sans-serif;
+/* Utility classes */
+.hidden {
+    display: none;
 }
 
-a {
-  color: #00B7FF;
+/* Immersive view container */
+#immersive {
+    width: 100%;
+    height: 100vh;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
 }
 
-/* Immersive View Controls */
-#immersive-controls {
-  text-align: center;
-}
-
-.immersive-btn {
-  background-color: #2d8cff;
-  color: white;
-  border: none;
-  padding: 12px 24px;
-  font-size: 16px;
-  border-radius: 6px;
-  cursor: pointer;
-  transition: background-color 0.2s ease;
-}
-
-.immersive-btn:hover {
-  background-color: #0b5cff;
-}
-
-.immersive-btn:disabled {
-  background-color: #cccccc;
-  cursor: not-allowed;
-}
-
-.immersive-btn.active {
-  background-color: #e02828;
-}
-
-.immersive-btn.active:hover {
-  background-color: #c01f1f;
-}
-
+/* Immersive canvas fills viewport */
 #immersive-canvas {
-  background-color: #1a1a1a;
+    width: 100%;
+    height: 100%;
+    display: block;
 }
 
-body.immersive-active h1,
-body.immersive-active p {
-  display: none;
+/* Toggle button styling */
+#toggle-view {
+    padding: 10px 20px;
+    font-size: 16px;
+    cursor: pointer;
+    background-color: #2D8CFF;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    margin-top: 10px;
+}
+
+#toggle-view:hover {
+    background-color: #0B5CFF;
+}
+
+#toggle-view:disabled {
+    background-color: #ccc;
+    cursor: not-allowed;
+}
+
+/* Main content styling */
+#main {
+    padding: 20px;
+    text-align: center;
+}
+
+#main h1 {
+    margin-bottom: 20px;
 }
