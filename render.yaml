@@ -22,7 +22,7 @@ services:
   - type: web
     name: zoom-context-app
     env: node
-    buildCommand: npm install --include=dev && npm run build
+    buildCommand: npm install && npm run build
     startCommand: npm start
     envVars:
       - key: NODE_ENV
