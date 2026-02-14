@@ -6,3 +6,45 @@ body {
 a {
   color: #00B7FF;
 }
+
+/* Immersive View Controls */
+#immersive-controls {
+  text-align: center;
+}
+
+.immersive-btn {
+  background-color: #2d8cff;
+  color: white;
+  border: none;
+  padding: 12px 24px;
+  font-size: 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.immersive-btn:hover {
+  background-color: #0b5cff;
+}
+
+.immersive-btn:disabled {
+  background-color: #cccccc;
+  cursor: not-allowed;
+}
+
+.immersive-btn.active {
+  background-color: #e02828;
+}
+
+.immersive-btn.active:hover {
+  background-color: #c01f1f;
+}
+
+#immersive-canvas {
+  background-color: #1a1a1a;
+}
+
+body.immersive-active h1,
+body.immersive-active p {
+  display: none;
+}
