@@ -1,9 +1,15 @@
 import zoomSdk from '@zoom/appssdk';
 
-// State management
+// State management.
 let isImmersiveActive = false;
 let participants = [];
 let canvasContext = null;
+
+// Get components.
+const content = document.getElementById('main');
+const toggleButton = document.getElementById('toggle-view');
+const canvas = document.getElementById('immersive-canvas');
+const ctx = canvas.getContext('2d');
 
 (async () => {
     try {
@@ -33,12 +39,9 @@ let canvasContext = null;
             const userContext = await zoomSdk.getUserContext();
             const { role } = userContext;
 
+            // Show the toggle button for the host.
             if (role === 'host') {
-                setupImmersiveView();
-            } else {
-                // Hide controls for non-hosts
-                const controls = document.getElementById('immersive-controls');
-                if (controls) controls.style.display = 'none';
+                toggleButton.classList.remove('hidden');
             }
         }
     } catch (e) {

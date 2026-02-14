@@ -1,18 +1,15 @@
 extends layout
+include mixins/prompt-install
 
 block content
-    h1=title
     if isZoom
-        p Welcome to your Zoom App
-        // Immersive view controls (only visible to host)
-        #immersive-controls(style="margin-top: 20px;")
-            button#toggle-immersive.immersive-btn Start Immersive View
-        // Canvas for immersive rendering (hidden by default)
-        canvas#immersive-canvas(style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 1000;")
+        .hidden#main
+            h1= title
+            button#toggle-view Start
+   
+        canvas#immersive-canvas
     else
-        p You're viewing your Zoom App through the browser.&nbsp;
-            a(href=`/install`) Click Here
-            | &nbsp;to install your app in Zoom.
+        +prompt-install(title, installURL)
 
 append scripts
     if isZoom
