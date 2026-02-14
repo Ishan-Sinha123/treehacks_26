@@ -2,6 +2,7 @@ import zoomSdk from '@zoom/appssdk';
 
 // State
 let participants = [];
+let inImmersiveView = false;
 
 // Get components
 const mainContent = document.getElementById('main');
@@ -36,7 +37,7 @@ const immersiveContainer = document.getElementById('immersive');
             const userContext = await zoomSdk.getUserContext();
             if (userContext.role === 'host') {
                 toggleButton.classList.remove('hidden');
-                toggleButton.addEventListener('click', startImmersiveView);
+                toggleButton.addEventListener('click', toggleImmersiveView);
             }
         } else if (runningContext === 'inImmersive') {
             // IMMERSIVE MODE
@@ -61,41 +62,45 @@ const immersiveContainer = document.getElementById('immersive');
 })();
 
 /**
- * Start immersive view from sidebar
+ * Toggle immersive view from sidebar.
  */
-async function startImmersiveView() {
-    try {
-        await zoomSdk.runRenderingContext({ view: 'immersive' });
-        console.log('Starting immersive view - app will reload');
-        // App will reload in 'inImmersive' context
-    } catch (error) {
-        console.error('Failed to start immersive view:', error);
+async function toggleImmersiveView() {
+    if (inImmersiveView) {
+        try {
+            await zoomSdk.closeRenderingContext();
+            console.log('Closing immersive view - app will return to sidebar');
+            // App will return to 'inMeeting' context
+            inImmersiveView = false;
+        } catch (error) {
+            console.error('Failed to stop immersive view:', error);
+        }
+    } else {
+        try {
+            await zoomSdk.runRenderingContext({ view: 'immersive' });
+            console.log('Starting immersive view - app will reload');
+            // App will reload in 'inImmersive' context
+            inImmersiveView = true;
+        } catch (error) {
+            console.error('Failed to start immersive view:', error);
+        }
     }
 }
 
 /**
- * Stop immersive view (optional - can be called from console or exit button)
- */
-async function stopImmersiveView() {
-    try {
-        await zoomSdk.closeRenderingContext();
-        console.log('Closing immersive view - app will return to sidebar');
-        // App will return to 'inMeeting' context
-    } catch (error) {
-        console.error('Failed to stop immersive view:', error);
-    }
-}
-
-/**
- * Draw participants in 2x2 grid (up to 4 participants)
+ * Draw participants in 2x2 grid (up to 4 participants).
  */
 async function drawParticipants() {
     // Clear existing participants first
     for (const p of participants) {
         try {
-            await zoomSdk.clearParticipant({ participantUUID: p.participantUUID });
+            await zoomSdk.clearParticipant({
+                participantUUID: p.participantUUID,
+            });
         } catch (error) {
-            console.error(`Failed to clear participant ${p.screenName}:`, error);
+            console.error(
+                `Failed to clear participant ${p.screenName}:`,
+                error
+            );
         }
     }
 
@@ -107,10 +112,10 @@ async function drawParticipants() {
 
     // Define 4 quadrant positions
     const positions = [
-        { x: 0, y: 0 },                    // Top-left
-        { x: halfWidth, y: 0 },            // Top-right
-        { x: 0, y: halfHeight },           // Bottom-left
-        { x: halfWidth, y: halfHeight }    // Bottom-right
+        { x: 0, y: 0 }, // Top-left
+        { x: halfWidth, y: 0 }, // Top-right
+        { x: 0, y: halfHeight }, // Bottom-left
+        { x: halfWidth, y: halfHeight }, // Bottom-right
     ];
 
     // Draw up to 4 participants
@@ -126,11 +131,18 @@ async function drawParticipants() {
                 y: Math.round(pos.y),
                 width: Math.round(halfWidth),
                 height: Math.round(halfHeight),
-                zIndex: 1
+                zIndex: 1,
             });
-            console.log(`Drew participant: ${participant.screenName || participant.participantUUID} at position ${i}`);
+            console.log(
+                `Drew participant: ${
+                    participant.screenName || participant.participantUUID
+                } at position ${i}`
+            );
         } catch (error) {
-            console.error(`Failed to draw participant ${participant.screenName}:`, error);
+            console.error(
+                `Failed to draw participant ${participant.screenName}:`,
+                error
+            );
         }
     }
 }
