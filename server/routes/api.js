@@ -2,14 +2,14 @@ import express from 'express';
 import { handleError, sanitize } from '../helpers/routing.js';
 import {
     getSpeakerContext,
-    vectorSearch,
+    semanticSearch,
     esClient,
 } from '../helpers/elasticsearch.js';
 
 const router = express.Router();
 
 /**
- * Feature 1: Get speaker context
+ * Feature 1: Get speaker context (generated summary)
  * GET /api/speaker/:speakerId/context?meetingId=XXX
  */
 router.get('/speaker/:speakerId/context', async (req, res, next) => {
@@ -22,19 +22,16 @@ router.get('/speaker/:speakerId/context', async (req, res, next) => {
             return res.status(400).json({ error: 'meetingId required' });
         }
 
-        const segments = await getSpeakerContext(speakerId, meetingId);
+        const context = await getSpeakerContext(speakerId, meetingId);
 
-        // Aggregate into context summary
-        const context = {
-            speaker_id: speakerId,
-            meeting_id: meetingId,
-            total_segments: segments.length,
-            segments: segments.map((s) => ({
-                text: s.text,
-                summary: s.summary,
-                timestamp: s.timestamp,
-            })),
-        };
+        if (!context) {
+            return res.json({
+                speaker_id: speakerId,
+                meeting_id: meetingId,
+                context_summary: null,
+                message: 'No summary available yet for this speaker.',
+            });
+        }
 
         res.json(context);
     } catch (e) {
@@ -43,31 +40,7 @@ router.get('/speaker/:speakerId/context', async (req, res, next) => {
 });
 
 /**
- * Feature 2: Get topic stack for meeting
- * GET /api/topics/:meetingId
- */
-router.get('/topics/:meetingId', async (req, res, next) => {
-    try {
-        sanitize(req);
-        const { meetingId } = req.params;
-
-        const result = await esClient.search({
-            index: 'topic_stack',
-            body: {
-                query: { match: { meeting_id: meetingId } },
-                sort: [{ start_time: 'asc' }],
-            },
-        });
-
-        const topics = result.hits.hits.map((hit) => hit._source);
-        res.json({ meeting_id: meetingId, topics });
-    } catch (e) {
-        next(handleError(e));
-    }
-});
-
-/**
- * Feature 3: Chat with speaker context
+ * Feature 2: Chat with speaker context
  * POST /api/chat/:speakerId
  * Body: { question: string, meetingId: string }
  */
@@ -83,23 +56,43 @@ router.post('/chat/:speakerId', async (req, res, next) => {
                 .json({ error: 'question and meetingId required' });
         }
 
-        // Get speaker context
-        const segments = await getSpeakerContext(speakerId, meetingId);
-        const context = segments.map((s) => s.text).join('\n');
+        // 1. Get speaker summary from speaker_context
+        const context = await getSpeakerContext(speakerId, meetingId);
+        const summary = context?.context_summary || '';
 
-        // Call ES inference API for chat completion using Anthropic
+        // 2. Semantic search scoped to this speaker for relevant chunks
+        let relevantChunks = [];
         try {
-            const prompt = `Context from speaker:\n${context.substring(
-                0,
-                3000
-            )}\n\nQuestion: ${question}`;
+            relevantChunks = await semanticSearch(
+                question,
+                meetingId,
+                speakerId,
+                5
+            );
+        } catch (err) {
+            console.warn('Semantic search failed during chat:', err.message);
+        }
 
+        const chunksText = relevantChunks
+            .map((c) => c.text)
+            .join('\n---\n')
+            .substring(0, 3000);
+
+        // 3. Build prompt with summary + relevant chunks + question
+        const prompt = `You are answering questions about what a speaker said in a meeting.
+
+${summary ? `Speaker summary:\n${summary}\n\n` : ''}${
+            chunksText ? `Relevant transcript excerpts:\n${chunksText}\n\n` : ''
+        }Question: ${question}
+
+Answer concisely based on the context provided.`;
+
+        // 4. Call Anthropic via ES inference
+        try {
             const completion = await esClient.transport.request({
                 method: 'POST',
                 path: '/_inference/completion/anthropic_completion',
-                body: {
-                    input: prompt,
-                },
+                body: { input: prompt },
             });
 
             res.json({
@@ -109,7 +102,6 @@ router.post('/chat/:speakerId', async (req, res, next) => {
                 speaker_id: speakerId,
             });
         } catch (inferenceError) {
-            // Fallback if inference endpoint not configured
             console.warn(
                 'Inference endpoint not configured:',
                 inferenceError.message
@@ -117,7 +109,7 @@ router.post('/chat/:speakerId', async (req, res, next) => {
             res.json({
                 answer: 'Chat feature requires Elasticsearch Anthropic inference endpoint to be configured.',
                 speaker_id: speakerId,
-                context_available: segments.length > 0,
+                context_available: !!summary,
             });
         }
     } catch (e) {
@@ -126,50 +118,40 @@ router.post('/chat/:speakerId', async (req, res, next) => {
 });
 
 /**
- * Feature 4: Semantic search for similar segments
+ * Feature 3: Semantic search across transcript chunks
  * POST /api/semantic-search
- * Body: { query: string, meetingId?: string, k?: number }
+ * Body: { query: string, meetingId?: string, speakerId?: string, size?: number }
  */
 router.post('/semantic-search', async (req, res, next) => {
     try {
         sanitize(req);
-        const { query, meetingId, k = 5 } = req.body;
+        const { query, meetingId, speakerId, size = 10 } = req.body;
 
         if (!query) {
             return res.status(400).json({ error: 'query required' });
         }
 
-        // Generate query embedding via ES inference
         try {
-            const embeddingResult = await esClient.inference.inference({
-                inference_id: 'jina_embeddings',
-                input: query,
-            });
-
-            const queryEmbedding = embeddingResult.inference?.[0]?.embedding;
-
-            if (!queryEmbedding) {
-                throw new Error('No embedding generated');
-            }
-
-            // Perform vector search
-            const results = await vectorSearch(queryEmbedding, meetingId, k);
+            const results = await semanticSearch(
+                query,
+                meetingId,
+                speakerId,
+                size
+            );
 
             res.json({
                 query,
                 results: results.map((r) => ({
                     text: r.text,
-                    summary: r.summary,
-                    speaker_name: r.speaker_name,
-                    timestamp: r.timestamp,
-                    similarity_score: r.score,
+                    speaker_names: r.speaker_names,
+                    start_time: r.start_time,
+                    end_time: r.end_time,
+                    chunk_id: r.chunk_id,
+                    score: r.score,
                 })),
             });
         } catch (inferenceError) {
-            console.warn(
-                'Inference endpoint not configured:',
-                inferenceError.message
-            );
+            console.warn('Semantic search failed:', inferenceError.message);
             res.json({
                 query,
                 results: [],
@@ -183,25 +165,25 @@ router.post('/semantic-search', async (req, res, next) => {
 });
 
 /**
- * Get all segments for a meeting (for debugging/demo)
- * GET /api/segments/:meetingId
+ * Get all chunks for a meeting (debugging/demo)
+ * GET /api/chunks/:meetingId
  */
-router.get('/segments/:meetingId', async (req, res, next) => {
+router.get('/chunks/:meetingId', async (req, res, next) => {
     try {
         sanitize(req);
         const { meetingId } = req.params;
 
         const result = await esClient.search({
-            index: 'transcript_segments',
+            index: 'transcript_chunks',
             body: {
                 query: { match: { meeting_id: meetingId } },
-                sort: [{ timestamp: 'asc' }],
+                sort: [{ start_time: 'asc' }],
                 size: 1000,
             },
         });
 
-        const segments = result.hits.hits.map((hit) => hit._source);
-        res.json({ meeting_id: meetingId, total: segments.length, segments });
+        const chunks = result.hits.hits.map((hit) => hit._source);
+        res.json({ meeting_id: meetingId, total: chunks.length, chunks });
     } catch (e) {
         next(handleError(e));
     }

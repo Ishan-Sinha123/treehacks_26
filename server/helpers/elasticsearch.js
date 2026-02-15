@@ -53,22 +53,19 @@ export async function initializeIndices() {
             },
         },
         {
-            name: 'transcript_segments',
+            name: 'transcript_chunks',
             mappings: {
                 properties: {
                     meeting_id: { type: 'keyword' },
-                    speaker_id: { type: 'keyword' },
-                    speaker_name: { type: 'text' },
-                    timestamp: { type: 'date' },
-                    text: { type: 'text' },
-                    summary: { type: 'text' },
-                    embedding: {
-                        type: 'dense_vector',
-                        dims: 1024, // Jina embeddings v3
-                        index: true,
-                        similarity: 'cosine',
+                    speaker_ids: { type: 'keyword' },
+                    speaker_names: { type: 'keyword' },
+                    start_time: { type: 'date' },
+                    end_time: { type: 'date' },
+                    text: {
+                        type: 'semantic_text',
+                        inference_id: 'jina_embeddings',
                     },
-                    segment_id: { type: 'keyword' },
+                    chunk_id: { type: 'keyword' },
                 },
             },
         },
@@ -77,22 +74,12 @@ export async function initializeIndices() {
             mappings: {
                 properties: {
                     speaker_id: { type: 'keyword' },
+                    speaker_name: { type: 'text' },
                     meeting_id: { type: 'keyword' },
                     context_summary: { type: 'text' },
                     topics: { type: 'keyword' },
                     last_updated: { type: 'date' },
-                },
-            },
-        },
-        {
-            name: 'topic_stack',
-            mappings: {
-                properties: {
-                    meeting_id: { type: 'keyword' },
-                    topic: { type: 'keyword' },
-                    start_time: { type: 'date' },
-                    end_time: { type: 'date' },
-                    segment_ids: { type: 'keyword' },
+                    segment_count: { type: 'integer' },
                 },
             },
         },
@@ -121,127 +108,96 @@ export async function initializeIndices() {
     indicesReady();
 }
 
-// Insert transcript segment
-export async function insertTranscriptSegment(segment) {
+// Insert a transcript chunk — ES auto-embeds via semantic_text
+export async function insertTranscriptChunk(chunk) {
     await indicesReadyPromise;
     try {
         const result = await esClient.index({
-            index: 'transcript_segments',
-            body: segment,
+            index: 'transcript_chunks',
+            body: chunk,
         });
+        console.log(`✅ Inserted transcript chunk: ${chunk.chunk_id}`);
         return result;
     } catch (error) {
-        console.error('Error inserting transcript segment:', error);
+        console.error('❌ Error inserting transcript chunk:', error);
         throw error;
     }
 }
 
-// Bulk insert transcript segments
-// Bulk insert transcript segments
-export async function bulkInsertSegments(segments) {
+// Semantic search — ES auto-embeds the query via jina_embeddings
+export async function semanticSearch(query, meetingId, speakerId, size = 10) {
     await indicesReadyPromise;
-
-    console.log(
-        `🔍 Attempting to insert ${segments.length} segments:`,
-        JSON.stringify(segments[0], null, 2)
-    );
-
-    const body = segments.flatMap((doc) => [
-        { index: { _index: 'transcript_segments' } },
-        doc,
-    ]);
-
     try {
-        const result = await esClient.bulk({ body, refresh: true });
+        const must = [{ semantic: { field: 'text', query } }];
+        const filter = [];
+        if (meetingId) filter.push({ term: { meeting_id: meetingId } });
+        if (speakerId) filter.push({ term: { speaker_ids: speakerId } });
 
-        console.log(`📊 Bulk response:`, JSON.stringify(result, null, 2));
+        const body = { query: { bool: { must, filter } }, size };
 
-        if (result.errors) {
-            console.error('❌ Bulk insert had errors:', result.items);
-        } else {
-            console.log(
-                `✅ Bulk insert successful: ${segments.length} segments`
-            );
-        }
-
-        return result;
-    } catch (error) {
-        console.error('❌ Error bulk inserting segments:', error);
-        throw error;
-    }
-}
-
-// Search speaker context
-export async function getSpeakerContext(speakerId, meetingId) {
-    try {
         const result = await esClient.search({
-            index: 'transcript_segments',
-            body: {
-                query: {
-                    bool: {
-                        must: [
-                            { match: { speaker_id: speakerId } },
-                            { match: { meeting_id: meetingId } },
-                        ],
-                    },
-                },
-                sort: [{ timestamp: 'desc' }],
-                size: 100,
-            },
+            index: 'transcript_chunks',
+            body,
         });
-        return result.hits.hits.map((hit) => hit._source);
-    } catch (error) {
-        console.error('Error getting speaker context:', error);
-        throw error;
-    }
-}
 
-// Vector search for similar segments
-export async function vectorSearch(embedding, meetingId = null, k = 5) {
-    const query = {
-        knn: {
-            field: 'embedding',
-            query_vector: embedding,
-            k,
-            num_candidates: 100,
-        },
-    };
-
-    if (meetingId) {
-        query.filter = { term: { meeting_id: meetingId } };
-    }
-
-    try {
-        const result = await esClient.search({
-            index: 'transcript_segments',
-            body: query,
-        });
-        return result.hits.hits.map((hit) => ({
-            ...hit._source,
-            score: hit._score,
+        return result.hits.hits.map((h) => ({
+            ...h._source,
+            score: h._score,
         }));
     } catch (error) {
-        console.error('Error in vector search:', error);
+        console.error('❌ Error in semantic search:', error);
         throw error;
     }
 }
 
-// Update segment with summary and embedding (will be populated by ES inference)
-export async function updateSegment(segmentId, updates) {
+// Upsert speaker context (summary + topics)
+export async function upsertSpeakerContext(
+    speakerId,
+    speakerName,
+    meetingId,
+    summary,
+    topics,
+    segmentCount
+) {
+    await indicesReadyPromise;
     try {
-        const result = await esClient.update({
-            index: 'transcript_segments',
-            id: segmentId,
+        const docId = `${meetingId}-${speakerId}`;
+        const result = await esClient.index({
+            index: 'speaker_context',
+            id: docId,
             body: {
-                doc: {
-                    ...updates,
-                    processed_at: new Date(),
-                },
+                speaker_id: speakerId,
+                speaker_name: speakerName,
+                meeting_id: meetingId,
+                context_summary: summary,
+                topics,
+                last_updated: new Date().toISOString(),
+                segment_count: segmentCount,
             },
         });
+        console.log(`✅ Upserted speaker context: ${speakerName} (${docId})`);
         return result;
     } catch (error) {
-        console.error('Error updating segment:', error);
+        console.error('❌ Error upserting speaker context:', error);
+        throw error;
+    }
+}
+
+// Get speaker context from speaker_context index
+export async function getSpeakerContext(speakerId, meetingId) {
+    await indicesReadyPromise;
+    try {
+        const docId = `${meetingId}-${speakerId}`;
+        const result = await esClient.get({
+            index: 'speaker_context',
+            id: docId,
+        });
+        return result._source;
+    } catch (error) {
+        if (error.meta?.statusCode === 404) {
+            return null;
+        }
+        console.error('❌ Error getting speaker context:', error);
         throw error;
     }
 }
