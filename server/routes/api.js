@@ -142,7 +142,7 @@ router.post('/semantic-search', async (req, res, next) => {
         // Generate query embedding via ES inference
         try {
             const embeddingResult = await esClient.inference.inference({
-                inference_id: 'jina-embeddings', // Will be configured in ES
+                inference_id: 'jina_embeddings',
                 input: query,
             });
 
