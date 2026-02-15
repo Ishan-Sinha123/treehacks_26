@@ -24,6 +24,53 @@ const participantNames = [
     participant4Name,
 ];
 
+// Context buttons and containers
+const showContextButtons = [
+    document.getElementById('show-participant-1-context'),
+    document.getElementById('show-participant-2-context'),
+    document.getElementById('show-participant-3-context'),
+    document.getElementById('show-participant-4-context'),
+];
+
+const hideContextButtons = [
+    document.getElementById('hide-participant-1-context'),
+    document.getElementById('hide-participant-2-context'),
+    document.getElementById('hide-participant-3-context'),
+    document.getElementById('hide-participant-4-context'),
+];
+
+const contextContainers = [
+    document.getElementById('user-1-context'),
+    document.getElementById('user-2-context'),
+    document.getElementById('user-3-context'),
+    document.getElementById('user-4-context'),
+];
+
+/**
+ * Initialize context toggle buttons
+ */
+function initializeContextToggle() {
+    // Set up show button listeners
+    for (let i = 0; i < showContextButtons.length; i++) {
+        if (showContextButtons[i] && contextContainers[i]) {
+            showContextButtons[i].addEventListener('click', () => {
+                contextContainers[i].classList.remove('is-hidden');
+                showContextButtons[i].classList.add('is-hidden');
+            });
+        }
+    }
+
+    // Set up hide button listeners
+    for (let i = 0; i < hideContextButtons.length; i++) {
+        if (hideContextButtons[i] && contextContainers[i]) {
+            hideContextButtons[i].addEventListener('click', () => {
+                contextContainers[i].classList.add('is-hidden');
+                showContextButtons[i].classList.remove('is-hidden');
+            });
+        }
+    }
+}
+
 // Initialize app
 (async () => {
     try {
@@ -59,6 +106,9 @@ const participantNames = [
             // IMMERSIVE MODE
             mainContent.classList.add('hidden');
             immersiveContainer.classList.remove('hidden');
+
+            // Initialize context toggle buttons
+            initializeContextToggle();
 
             // Get and draw participants
             const response = await zoomSdk.getMeetingParticipants();
