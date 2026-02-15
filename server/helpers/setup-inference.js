@@ -43,7 +43,7 @@ export async function setupInferenceEndpoints() {
                     service: 'anthropic',
                     service_settings: {
                         api_key: anthropicApiKey,
-                        model_id: 'claude-3-5-sonnet-20240620',
+                        model_id: 'claude-sonnet-4-5-20250929',
                     },
                     task_settings: {
                         max_tokens: 1024,
