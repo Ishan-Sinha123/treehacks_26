@@ -26,7 +26,7 @@ ${
 }New statements from ${speakerName}:
 ${recentText}
 
-Provide a concise updated summary of everything ${speakerName} has discussed. Include key points, positions, and any action items. Also list 1-3 topic keywords. Respond in JSON: { "summary": "...", "topics": ["..."] }`;
+Provide a concise updated summary (1-2 sentences max) of everything ${speakerName} has discussed. Focus on key points and positions. Also list 1-3 topic keywords. Respond in JSON: { "summary": "...", "topics": ["..."] }`;
 
     const result = await esClient.transport.request({
         method: 'POST',

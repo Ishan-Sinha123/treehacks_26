@@ -338,7 +338,25 @@ async function handleParticipantChange(event) {
 
     try {
         const response = await zoomSdk.getMeetingParticipants();
-        participants = response.participants || [];
+        const latest = response.participants || [];
+
+        // Keep existing participants in their slots, append new ones
+        const existingUUIDs = new Set(
+            participants.map((p) => p.participantUUID)
+        );
+        const newParticipants = latest.filter(
+            (p) => !existingUUIDs.has(p.participantUUID)
+        );
+
+        // Remove participants who left
+        const latestUUIDs = new Set(latest.map((p) => p.participantUUID));
+        participants = participants.filter((p) =>
+            latestUUIDs.has(p.participantUUID)
+        );
+
+        // Append new ones at the end
+        participants = [...participants, ...newParticipants];
+
         await drawParticipants();
     } catch (error) {
         console.error('Failed to handle participant change:', error);
