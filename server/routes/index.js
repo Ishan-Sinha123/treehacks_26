@@ -68,6 +68,15 @@ router.get('/', async (req, res, next) => {
                 'More concepts about things',
                 'Something else',
             ],
+            chatHistory: [
+                'What did Kenneth say about AI?',
+                'Kenneth said that AI is a powerful tool that can be used to enhance our products, but we need to be careful about data privacy and security.',
+                'Why did Kenneth say that?',
+                'Kenneth is concerned about data privacy and security because LLMs often require large amounts of data to train, and there is a risk that sensitive information could be exposed if not handled properly.',
+                'What are some ways we can mitigate those risks?',
+                'We can mitigate those risks by implementing strong data encryption, using anonymized data for training, and ensuring that we have robust access controls in place.',
+            ],
+            chatTarget: 'user1',
         });
     } catch (e) {
         next(handleError(e));
