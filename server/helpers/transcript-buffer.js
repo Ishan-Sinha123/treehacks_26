@@ -1,7 +1,7 @@
 import { EventEmitter } from 'events';
 
-const SUMMARY_INTERVAL_MS = 30_000; // summarize every 30s
-const CHUNK_INTERVAL_MS = 60_000; // flush chunk every 60s
+const SUMMARY_INTERVAL_MS = 10_000; // summarize every 10s
+const CHUNK_INTERVAL_MS = 30_000; // flush chunk every 30s
 const CHUNK_WORD_THRESHOLD = 500; // or when 500+ words accumulated
 const SPEAKER_IDLE_MS = 10_000; // summarize when speaker idle 10s
 
