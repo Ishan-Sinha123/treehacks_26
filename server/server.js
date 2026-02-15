@@ -19,7 +19,11 @@ export async function start(app, port) {
     if (connected) {
         // Inference endpoints must exist before creating indices
         // (transcript_chunks needs jina_embeddings for semantic_text field)
-        await setupInferenceEndpoints();
+        try {
+            await setupInferenceEndpoints();
+        } catch (err) {
+            console.error('⚠️ Inference endpoint setup failed:', err.message);
+        }
 
         console.log('🔄 Initializing Elasticsearch indices...');
         await initializeIndices();

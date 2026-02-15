@@ -152,7 +152,6 @@ export async function semanticSearch(query, meetingId, speakerId, size = 10) {
     await indicesReadyPromise;
 
     const filter = [];
-    if (meetingId) filter.push({ term: { meeting_id: meetingId } });
     if (speakerId) filter.push({ term: { speaker_ids: speakerId } });
 
     // Try semantic search first (requires jina_embeddings + semantic_text field)
