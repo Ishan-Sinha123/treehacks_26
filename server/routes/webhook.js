@@ -41,7 +41,9 @@ async function ensureRTMSInitialized() {
             }`
         );
 
-        const buffer = getOrCreateBuffer(eventData.meetingId);
+        const meetingId = String(eventData.meetingId);
+        wireBufferEvents(meetingId);
+        const buffer = getOrCreateBuffer(meetingId);
 
         buffer.append({
             speakerId: String(eventData.userId || 'unknown'),
@@ -121,8 +123,6 @@ router.post('/', async (req, res) => {
 
     // Forward event to RTMSManager — it handles the RTMS connection lifecycle
     if (event === 'meeting.rtms_started') {
-        const meetingId = payload?.object?.id || payload?.object?.meeting_id;
-        if (meetingId) wireBufferEvents(String(meetingId));
         dbg(`Forwarding ${event} to RTMSManager`);
         RTMSManager.handleEvent(event, payload);
     } else if (event === 'meeting.rtms_stopped') {
