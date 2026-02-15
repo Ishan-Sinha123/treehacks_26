@@ -98,14 +98,14 @@ function initializeContextToggle() {
 
             const userContext = await zoomSdk.getUserContext();
             if (userContext.role === 'host') {
-                toggleButton.classList.remove('hidden');
+                toggleButton.classList.remove('is-hidden');
                 toggleButton.addEventListener('click', toggleImmersiveView);
                 initializeChat();
             }
         } else if (runningContext === 'inImmersive') {
             // IMMERSIVE MODE
-            mainContent.classList.add('hidden');
-            immersiveContainer.classList.remove('hidden');
+            mainContent.classList.add('is-hidden');
+            immersiveContainer.classList.remove('is-hidden');
 
             // Initialize context toggle buttons
             initializeContextToggle();
