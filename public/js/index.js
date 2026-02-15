@@ -85,41 +85,20 @@ function initializeContextToggle() {
  * Poll speakers from backend and update UI
  */
 async function pollSpeakers() {
-    if (!meetingId) {
-        console.warn('[poll] No meetingId — skipping');
-        return;
-    }
+    if (!meetingId) return;
 
     try {
-        const url = `/api/meeting/${meetingId}/speakers`;
-        const response = await fetch(url);
-
-        if (!response.ok) {
-            console.warn(`[poll] HTTP ${response.status} — skipping`);
-            return;
-        }
-
+        const response = await fetch(`/api/meeting/${meetingId}/speakers`);
         const data = await response.json();
         const speakers = data.speakers || [];
 
         if (speakers.length === 0) return;
 
-        console.log(`[poll] ${speakers.length} speakers (uuid=${data.uuid})`);
-
         // Update immersive view participant summaries
         // Match speakers to participant slots by name
         for (let i = 0; i < participantNames.length; i++) {
             const slotName = participantNames[i]?.textContent?.trim();
-            if (!slotName || slotName === `Participant ${i + 1}`) {
-                // Fallback: if names weren't set by drawParticipants, assign speakers by index
-                if (speakers[i] && participantSummaries[i]) {
-                    participantNames[i].textContent =
-                        speakers[i].speaker_name || `Speaker ${i + 1}`;
-                    participantSummaries[i].textContent =
-                        speakers[i].context_summary || 'No summary yet.';
-                }
-                continue;
-            }
+            if (!slotName || slotName === `Participant ${i + 1}`) continue;
 
             const matched = speakers.find(
                 (s) =>
@@ -213,10 +192,6 @@ function startPolling() {
         // Capture meetingId
         try {
             const meetingContext = await zoomSdk.getMeetingContext();
-            console.log(
-                'Full meeting context:',
-                JSON.stringify(meetingContext)
-            );
             meetingId = meetingContext.meetingID || null;
             console.log('Meeting ID:', meetingId);
         } catch (err) {
@@ -226,16 +201,11 @@ function startPolling() {
         const { runningContext } = configResponse;
 
         if (runningContext === 'inMeeting') {
+            // SIDEBAR MODE
+            await zoomSdk.callZoomApi('startRTMS');
+
             const userContext = await zoomSdk.getUserContext();
             if (userContext.role === 'host') {
-                // Start RTMS — triggers Zoom to send meeting.rtms_started webhook
-                try {
-                    await zoomSdk.callZoomApi('startRTMS');
-                    console.log('RTMS started successfully');
-                } catch (rtmsErr) {
-                    console.warn('Failed to start RTMS:', rtmsErr.message);
-                }
-
                 toggleButton.classList.remove('is-hidden');
                 toggleButton.addEventListener('click', toggleImmersiveView);
                 initializeChat();
@@ -326,8 +296,8 @@ async function drawParticipants() {
 
     // Draw up to 4 participants
     const displayParticipants = participants.slice(0, 4);
-    for (let i = 0; i < 4; i++) {
-        const participant = displayParticipants[0];
+    for (let i = 0; i < displayParticipants.length; i++) {
+        const participant = displayParticipants[i];
         const pos = positions[i];
 
         try {

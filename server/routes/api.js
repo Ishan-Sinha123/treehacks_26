@@ -186,22 +186,27 @@ router.get('/meeting/:meetingId/speakers', async (req, res, next) => {
         sanitize(req);
         const { meetingId } = req.params;
 
-        let speakers = [];
-        try {
-            const result = await esClient.search({
-                index: 'speaker_context',
-                body: {
-                    query: { match_all: {} },
-                    sort: [{ last_updated: 'desc' }],
-                    size: 50,
-                },
-            });
-            speakers = result.hits.hits.map((hit) => hit._source);
-        } catch (searchErr) {
-            console.warn('speaker_context search failed:', searchErr.message);
-        }
+        // Frontend sends numeric meeting ID, ES stores UUID — translate
+        const uuid = await getMeetingUuid(meetingId);
+        const queryId = uuid || meetingId;
+        console.log(
+            `🔎 GET /api/meeting/${meetingId}/speakers → querying ES with meeting_id="${queryId}" (translated: ${!!uuid})`
+        );
 
-        res.json({ meeting_id: meetingId, speakers });
+        const result = await esClient.search({
+            index: 'speaker_context',
+            body: {
+                query: { term: { meeting_id: queryId } },
+                sort: [{ last_updated: 'desc' }],
+                size: 50,
+            },
+        });
+
+        const speakers = result.hits.hits.map((hit) => hit._source);
+        console.log(
+            `🔎 GET /api/meeting/${meetingId}/speakers → found ${speakers.length} speakers`
+        );
+        res.json({ meeting_id: meetingId, uuid: queryId, speakers });
     } catch (e) {
         next(handleError(e));
     }
