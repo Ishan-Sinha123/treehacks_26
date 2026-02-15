@@ -15,6 +15,13 @@ const dbg = debug(`${appName}:webhook`);
 
 let rtmsInitialized = false;
 
+// Map numeric meeting ID → UUID (populated when RTMS starts)
+const meetingIdToUuid = new Map();
+
+export function getMeetingUuid(numericId) {
+    return meetingIdToUuid.get(String(numericId));
+}
+
 /**
  * Initialize RTMSManager singleton on first use
  */
@@ -123,6 +130,18 @@ router.post('/', async (req, res) => {
 
     // Forward event to RTMSManager — it handles the RTMS connection lifecycle
     if (event === 'meeting.rtms_started') {
+        // Capture numeric meeting ID → UUID mapping
+        const numericId = payload?.object?.id;
+        const uuid = payload?.object?.meeting_uuid;
+        if (numericId && uuid) {
+            meetingIdToUuid.set(String(numericId), uuid);
+            console.log(`📌 Meeting ID mapping: ${numericId} → ${uuid}`);
+        } else {
+            console.log(
+                '⚠️ RTMS started payload:',
+                JSON.stringify(payload?.object, null, 2)
+            );
+        }
         dbg(`Forwarding ${event} to RTMSManager`);
         RTMSManager.handleEvent(event, payload);
     } else if (event === 'meeting.rtms_stopped') {

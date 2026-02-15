@@ -3,6 +3,7 @@ import { handleError, sanitize } from '../helpers/routing.js';
 import { contextHeader, getAppContext } from '../helpers/cipher.js';
 import { getInstallURL } from '../helpers/zoom-api.js';
 import { semanticSearch, esClient } from '../helpers/elasticsearch.js';
+import { getMeetingUuid } from './webhook.js';
 import session from '../session.js';
 
 const router = express.Router();
@@ -80,10 +81,14 @@ router.post('/chat', async (req, res, next) => {
                 .json({ success: false, error: 'meetingId is required' });
         }
 
+        // Translate numeric meeting ID → UUID for ES queries
+        const uuid = getMeetingUuid(meetingId);
+        const queryId = uuid || meetingId;
+
         // 1. Semantic search for relevant transcript chunks
         let relevantChunks = [];
         try {
-            relevantChunks = await semanticSearch(message, meetingId, null, 5);
+            relevantChunks = await semanticSearch(message, queryId, null, 5);
         } catch (err) {
             console.warn('Semantic search failed during chat:', err.message);
         }

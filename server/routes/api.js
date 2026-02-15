@@ -5,6 +5,7 @@ import {
     semanticSearch,
     esClient,
 } from '../helpers/elasticsearch.js';
+import { getMeetingUuid } from './webhook.js';
 
 const router = express.Router();
 
@@ -173,17 +174,21 @@ router.get('/meeting/:meetingId/speakers', async (req, res, next) => {
         sanitize(req);
         const { meetingId } = req.params;
 
+        // Frontend sends numeric meeting ID, ES stores UUID — translate
+        const uuid = getMeetingUuid(meetingId);
+        const queryId = uuid || meetingId;
+
         const result = await esClient.search({
             index: 'speaker_context',
             body: {
-                query: { term: { meeting_id: meetingId } },
+                query: { term: { meeting_id: queryId } },
                 sort: [{ last_updated: 'desc' }],
                 size: 50,
             },
         });
 
         const speakers = result.hits.hits.map((hit) => hit._source);
-        res.json({ meeting_id: meetingId, speakers });
+        res.json({ meeting_id: meetingId, uuid: queryId, speakers });
     } catch (e) {
         next(handleError(e));
     }
