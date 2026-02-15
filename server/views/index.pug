@@ -3,15 +3,15 @@ include mixins/prompt-install
 
 block content
     if isZoom
-        #main
+        .content#main
             h1= title
-            button.hidden#toggle-view Toggle View
+            button.button.is-primary.hidden#toggle-view Toggle View
 
-        .hidden#immersive
+        .content.hidden#immersive
             canvas#immersive-canvas
-            p= participantContexts['user1']
-            p= participantContexts['user2']
-            p= participantContexts['user3']
+            h2= participantContexts['user1']
+            h2= participantContexts['user2']
+            h2= participantContexts['user3']
     else
         +prompt-install(title, installURL)
 
