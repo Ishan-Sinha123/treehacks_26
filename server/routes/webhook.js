@@ -36,10 +36,16 @@ async function ensureRTMSInitialized() {
         if (batch.length === 0) return;
         const toInsert = [...batch];
         batch = [];
-        dbg(`Flushing ${toInsert.length} segments to Elasticsearch`);
-        bulkInsertSegments(toInsert).catch((err) => {
-            console.error('Error inserting segments:', err);
-        });
+        console.log(`📤 Flushing ${toInsert.length} segments to Elasticsearch`);
+        bulkInsertSegments(toInsert)
+            .then(() => {
+                console.log(
+                    `✅ Successfully inserted ${toInsert.length} segments`
+                );
+            })
+            .catch((err) => {
+                console.error('❌ Error inserting segments:', err);
+            });
     }
 
     // Listen for transcript events from RTMSManager
@@ -61,6 +67,7 @@ async function ensureRTMSInitialized() {
                 .substr(2, 9)}`,
         };
 
+        console.log(`➕ Added to batch (batch size: ${batch.length + 1})`);
         batch.push(segment);
 
         if (batchTimer) clearTimeout(batchTimer);
@@ -68,7 +75,7 @@ async function ensureRTMSInitialized() {
     });
 
     rtmsInitialized = true;
-    dbg('RTMSManager initialized for transcript capture');
+    console.log('✅ RTMSManager initialized for transcript capture');
 }
 
 /**
