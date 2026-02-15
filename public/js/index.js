@@ -201,11 +201,16 @@ function startPolling() {
         const { runningContext } = configResponse;
 
         if (runningContext === 'inMeeting') {
-            // SIDEBAR MODE
-            await zoomSdk.callZoomApi('startRTMS');
-
             const userContext = await zoomSdk.getUserContext();
             if (userContext.role === 'host') {
+                // Start RTMS — triggers Zoom to send meeting.rtms_started webhook
+                try {
+                    await zoomSdk.callZoomApi('startRTMS');
+                    console.log('RTMS started successfully');
+                } catch (rtmsErr) {
+                    console.warn('Failed to start RTMS:', rtmsErr.message);
+                }
+
                 toggleButton.classList.remove('is-hidden');
                 toggleButton.addEventListener('click', toggleImmersiveView);
                 initializeChat();
