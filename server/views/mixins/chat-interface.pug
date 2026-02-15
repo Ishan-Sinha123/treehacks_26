@@ -1,6 +1,6 @@
 mixin chat-interface(chatTarget, chatHistory)
     #chat-container
-        h2.title.is-4 Chat with #{chatTarget}'s Context
+        h2.title.is-4 Chat with #{chatTarget === 'Your' ? 'Your' : `${chatTarget}'s`} Context
         #chat-messages.mb-3
             each message, index in chatHistory
                 if index % 2 === 0

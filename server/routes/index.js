@@ -76,7 +76,7 @@ router.get('/', async (req, res, next) => {
                 'What are some ways we can mitigate those risks?',
                 'We can mitigate those risks by implementing strong data encryption, using anonymized data for training, and ensuring that we have robust access controls in place.',
             ],
-            chatTarget: 'Kenneth Yang',
+            chatTarget: 'Your',
         });
     } catch (e) {
         next(handleError(e));
