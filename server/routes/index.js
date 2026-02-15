@@ -43,6 +43,7 @@ router.get('/', async (req, res, next) => {
                 user1: 'Wants to build an app with LLMs. Unsure how to get started.',
                 user2: 'Knows a bit about LLMs, but is concerned about data privacy and security.',
                 user3: "Isn't sure if they want to use LLMs in their app, but is interested in learning more about the possibilities.",
+                user4: 'Has experience with traditional software but wants to explore how AI can enhance their products.',
             },
         });
     } catch (e) {
