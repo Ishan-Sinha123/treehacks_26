@@ -23,7 +23,11 @@ router.get('/speaker/:speakerId/context', async (req, res, next) => {
             return res.status(400).json({ error: 'meetingId required' });
         }
 
-        const context = await getSpeakerContext(speakerId, meetingId);
+        // Translate numeric meeting ID → UUID
+        const uuid = getMeetingUuid(meetingId);
+        const queryId = uuid || meetingId;
+
+        const context = await getSpeakerContext(speakerId, queryId);
 
         if (!context) {
             return res.json({
@@ -57,8 +61,12 @@ router.post('/chat/:speakerId', async (req, res, next) => {
                 .json({ error: 'question and meetingId required' });
         }
 
+        // Translate numeric meeting ID → UUID
+        const uuid = getMeetingUuid(meetingId);
+        const queryId = uuid || meetingId;
+
         // 1. Get speaker summary from speaker_context
-        const context = await getSpeakerContext(speakerId, meetingId);
+        const context = await getSpeakerContext(speakerId, queryId);
         const summary = context?.context_summary || '';
 
         // 2. Semantic search scoped to this speaker for relevant chunks
@@ -66,7 +74,7 @@ router.post('/chat/:speakerId', async (req, res, next) => {
         try {
             relevantChunks = await semanticSearch(
                 question,
-                meetingId,
+                queryId,
                 speakerId,
                 5
             );
@@ -132,10 +140,14 @@ router.post('/semantic-search', async (req, res, next) => {
             return res.status(400).json({ error: 'query required' });
         }
 
+        // Translate numeric meeting ID → UUID if provided
+        const uuid = meetingId ? getMeetingUuid(meetingId) : null;
+        const queryId = uuid || meetingId;
+
         try {
             const results = await semanticSearch(
                 query,
-                meetingId,
+                queryId,
                 speakerId,
                 size
             );
@@ -203,10 +215,14 @@ router.get('/chunks/:meetingId', async (req, res, next) => {
         sanitize(req);
         const { meetingId } = req.params;
 
+        // Translate numeric meeting ID → UUID
+        const uuid = getMeetingUuid(meetingId);
+        const queryId = uuid || meetingId;
+
         const result = await esClient.search({
             index: 'transcript_chunks',
             body: {
-                query: { match: { meeting_id: meetingId } },
+                query: { match: { meeting_id: queryId } },
                 sort: [{ start_time: 'asc' }],
                 size: 1000,
             },

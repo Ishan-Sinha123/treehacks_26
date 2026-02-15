@@ -146,10 +146,17 @@ router.post('/', async (req, res) => {
         dbg(`Forwarding ${event} to RTMSManager`);
         RTMSManager.handleEvent(event, payload);
     } else if (event === 'meeting.rtms_stopped') {
-        const meetingId = payload?.object?.id || payload?.object?.meeting_id;
-        if (meetingId) {
-            destroyBuffer(String(meetingId));
-            wiredMeetings.delete(String(meetingId));
+        // Clean up using UUID (buffers/wiredMeetings are keyed by UUID)
+        const numericId = payload?.object?.meeting_id;
+        const uuid = meetingIdToUuid.get(String(numericId));
+        const cleanupId = uuid || numericId;
+        if (cleanupId) {
+            destroyBuffer(String(cleanupId));
+            wiredMeetings.delete(String(cleanupId));
+        }
+        // Clean up the mapping too
+        if (numericId) {
+            meetingIdToUuid.delete(String(numericId));
         }
         dbg(`Forwarding ${event} to RTMSManager`);
         RTMSManager.handleEvent(event, payload);
