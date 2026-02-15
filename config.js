@@ -42,7 +42,6 @@ export const port = config.PORT || '3000';
 export const elasticsearchUrl =
     config.ELASTICSEARCH_URL || 'http://localhost:9200';
 // NEW: API Keys (optional - features will be disabled if not set)
-export const openaiApiKey = config.OPENAI_API_KEY;
 export const anthropicApiKey = config.ANTHROPIC_API_KEY;
 export const jinaApiKey = config.JINA_API_KEY;
 // require secrets are explicitly imported
@@ -51,7 +50,6 @@ export default {
     redirectUri,
     port,
     elasticsearchUrl,
-    openaiApiKey,
     anthropicApiKey,
     jinaApiKey,
 };

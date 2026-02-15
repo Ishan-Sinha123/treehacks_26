@@ -87,14 +87,18 @@ router.post('/chat/:speakerId', async (req, res, next) => {
         const segments = await getSpeakerContext(speakerId, meetingId);
         const context = segments.map((s) => s.text).join('\n');
 
-        // Call ES inference API for chat completion
-        // This uses the inference endpoint we'll configure later
+        // Call ES inference API for chat completion using Anthropic
         try {
-            const completion = await esClient.inference.inference({
-                inference_id: 'openai-chat', // Will be configured in ES
-                input: question,
-                task_settings: {
-                    context: context.substring(0, 3000), // Limit context size
+            const prompt = `Context from speaker:\n${context.substring(
+                0,
+                3000
+            )}\n\nQuestion: ${question}`;
+
+            const completion = await esClient.transport.request({
+                method: 'POST',
+                path: '/_inference/completion/anthropic_completion',
+                body: {
+                    input: prompt,
                 },
             });
 
@@ -111,7 +115,7 @@ router.post('/chat/:speakerId', async (req, res, next) => {
                 inferenceError.message
             );
             res.json({
-                answer: 'Chat feature requires Elasticsearch inference endpoint to be configured.',
+                answer: 'Chat feature requires Elasticsearch Anthropic inference endpoint to be configured.',
                 speaker_id: speakerId,
                 context_available: segments.length > 0,
             });
