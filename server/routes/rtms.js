@@ -57,7 +57,7 @@ export function initializeRTMSWebSocket(server) {
                     speaker_name:
                         transcript.speaker_name || transcript.userName,
                     text: transcript.text,
-                    timestamp: new Date(transcript.timestamp || Date.now()),
+                    timestamp: new Date().toISOString(), // ✅ FIXED
                     segment_id: `${meetingId}-${Date.now()}-${Math.random()
                         .toString(36)
                         .substr(2, 9)}`,

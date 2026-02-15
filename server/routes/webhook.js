@@ -61,7 +61,7 @@ async function ensureRTMSInitialized() {
             speaker_id: String(eventData.userId || 'unknown'),
             speaker_name: eventData.userName || 'Unknown',
             text: eventData.text,
-            timestamp: new Date(eventData.timestamp || Date.now()),
+            timestamp: new Date().toISOString(), // ✅ FIXED
             segment_id: `${eventData.meetingId}-${Date.now()}-${Math.random()
                 .toString(36)
                 .substr(2, 9)}`,
