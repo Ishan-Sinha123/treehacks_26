@@ -13,7 +13,8 @@ import {
     destroyBuffer,
 } from '../helpers/transcript-buffer.js';
 import { summarizeSpeaker } from '../helpers/summarizer.js';
-import { ensureAgentExists } from '../helpers/agent-manager.js';
+// Agent network (parked — requires working Kibana Agent Builder)
+// import { ensureAgentExists } from '../helpers/agent-manager.js';
 
 const router = express.Router();
 const dbg = debug(`${appName}:webhook`);
@@ -137,13 +138,13 @@ async function ensureRTMSInitialized() {
             timestamp,
         });
 
-        // Lazily create an agent for this speaker on first speech
-        ensureAgentExists(speakerId, speakerName).catch((err) =>
-            console.warn(
-                `⚠️  Agent creation deferred for ${speakerName}:`,
-                err.message
-            )
-        );
+        // Agent network (parked — uncomment when Kibana Agent Builder is ready)
+        // ensureAgentExists(speakerId, speakerName).catch((err) =>
+        //     console.warn(
+        //         `⚠️  Agent creation deferred for ${speakerName}:`,
+        //         err.message
+        //     )
+        // );
     });
 
     rtmsInitialized = true;

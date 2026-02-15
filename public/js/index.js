@@ -423,7 +423,7 @@ async function handleChatSubmit() {
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ message, speakerName: screenName }),
+            body: JSON.stringify({ message }),
         });
 
         const data = await response.json();

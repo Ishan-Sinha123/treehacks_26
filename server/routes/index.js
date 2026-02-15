@@ -2,7 +2,9 @@ import express from 'express';
 import { handleError, sanitize } from '../helpers/routing.js';
 import { contextHeader, getAppContext } from '../helpers/cipher.js';
 import { getInstallURL } from '../helpers/zoom-api.js';
-import { handleUserChat } from '../helpers/agent-manager.js';
+import { semanticSearch, esClient } from '../helpers/elasticsearch.js';
+// Agent network (parked — requires Kibana 9.2 + working Agent Builder)
+// import { handleUserChat } from '../helpers/agent-manager.js';
 
 import session from '../session.js';
 
@@ -61,13 +63,14 @@ router.get('/install', session, async (req, res) => {
 });
 
 /*
- * Chat Route - Handle chat messages via agent network
+ * Chat Route - Semantic search + Anthropic inference
+ * (Agent network version parked — swap back when Kibana is ready)
  */
-router.post('/chat', async (req, res) => {
+router.post('/chat', async (req, res, next) => {
     try {
         sanitize(req);
 
-        const { message, speakerName } = req.body;
+        const { message } = req.body;
 
         if (!message || typeof message !== 'string' || message.trim() === '') {
             return res
@@ -75,21 +78,71 @@ router.post('/chat', async (req, res) => {
                 .json({ success: false, error: 'Message is required' });
         }
 
-        if (!speakerName || typeof speakerName !== 'string') {
-            return res
-                .status(400)
-                .json({ success: false, error: 'speakerName is required' });
+        // 1. Semantic search across all transcript chunks
+        let relevantChunks = [];
+        try {
+            relevantChunks = await semanticSearch(message, null, null, 5);
+        } catch (err) {
+            console.warn('Semantic search failed during chat:', err.message);
         }
 
-        const response = await handleUserChat(speakerName, message);
-        return res.json({ success: true, response });
+        const chunksText = relevantChunks
+            .map(
+                (c) =>
+                    `[${c.speaker_names?.join(', ') || 'Unknown'}]: ${c.text}`
+            )
+            .join('\n---\n')
+            .substring(0, 4000);
+
+        // 2. Build prompt with context + question
+        const prompt = `You are an AI assistant helping a meeting participant understand what's being discussed in their current meeting. Answer questions based on the transcript excerpts provided.
+
+${
+    chunksText
+        ? `Relevant transcript excerpts:\n${chunksText}\n\n`
+        : 'No transcript data available yet.\n\n'
+}Question: ${message}
+
+Answer concisely and helpfully based on the meeting context provided. If there is no relevant context, say so.`;
+
+        // 3. Call Anthropic via ES inference
+        try {
+            const completion = await esClient.transport.request({
+                method: 'POST',
+                path: '/_inference/completion/anthropic_completion',
+                body: { input: prompt },
+            });
+
+            const answer =
+                completion.completion?.[0]?.result || 'No response generated.';
+
+            return res.json({ success: true, response: answer });
+        } catch (inferenceError) {
+            console.warn('Inference endpoint error:', inferenceError.message);
+
+            if (relevantChunks.length > 0) {
+                const fallback = relevantChunks
+                    .map(
+                        (c) =>
+                            `${c.speaker_names?.join(', ') || 'Unknown'}: "${
+                                c.text
+                            }"`
+                    )
+                    .join('\n\n');
+                return res.json({
+                    success: true,
+                    response: `I found relevant transcript excerpts but the AI inference endpoint is not available. Here's what was said:\n\n${fallback}`,
+                });
+            }
+
+            return res.json({
+                success: true,
+                response:
+                    'The AI inference endpoint is not configured yet. Please set up the Elasticsearch Anthropic inference endpoint.',
+            });
+        }
     } catch (e) {
-        console.error('Chat error:', e.message);
-        return res.json({
-            success: false,
-            error: e.message,
-            response: `Sorry, I couldn't process that: ${e.message}`,
-        });
+        next(handleError(e));
     }
 });
 
