@@ -3,11 +3,11 @@ include mixins/prompt-install
 
 block content
     if isZoom
-        .content#main
+        .content.m-4#main
             h1= title
             button.button.is-primary.hidden#toggle-view Toggle View
 
-        .content.hidden#immersive
+        .content.hidden.m-4.mr-6#immersive
             .fixed-grid.has-4-cols
                 .grid
                     .cell

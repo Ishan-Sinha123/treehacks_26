@@ -38,7 +38,7 @@ router.get('/', async (req, res, next) => {
 
         return res.render('index', {
             isZoom: true,
-            title: `Hello Zoom`,
+            title: 'Context Assistant',
             participantContexts: {
                 user1: 'Wants to build an app with LLMs. Unsure how to get started.',
                 user2: 'Knows a bit about LLMs, but is concerned about data privacy and security.',
