@@ -185,12 +185,15 @@ router.get('/meeting/:meetingId/speakers', async (req, res, next) => {
     try {
         sanitize(req);
         const { meetingId } = req.params;
+        console.log(`\n========== SPEAKERS REQUEST ==========`);
+        console.log(`🔎 Input meetingId: "${meetingId}"`);
 
         // Frontend sends numeric meeting ID, ES stores UUID — translate
         const uuid = await getMeetingUuid(meetingId);
         const queryId = uuid || meetingId;
+        console.log(`🔎 UUID lookup result: ${uuid || 'null'}`);
         console.log(
-            `🔎 GET /api/meeting/${meetingId}/speakers → querying ES with meeting_id="${queryId}" (translated: ${!!uuid})`
+            `🔎 Querying speaker_context with meeting_id: "${queryId}"`
         );
 
         const result = await esClient.search({
@@ -204,10 +207,66 @@ router.get('/meeting/:meetingId/speakers', async (req, res, next) => {
 
         const speakers = result.hits.hits.map((hit) => hit._source);
         console.log(
-            `🔎 GET /api/meeting/${meetingId}/speakers → found ${speakers.length} speakers`
+            `🔎 ES returned ${result.hits.total?.value || 0} total hits, ${
+                speakers.length
+            } speakers`
         );
+        if (speakers.length > 0) {
+            console.log(
+                `🔎 First speaker: ${speakers[0].speaker_name}, meeting_id in doc: "${speakers[0].meeting_id}"`
+            );
+        }
+
+        // Also check what meetings exist in ES for debugging
+        try {
+            const meetingsResult = await esClient.search({
+                index: 'meetings',
+                body: { query: { match_all: {} }, size: 5 },
+            });
+            console.log(
+                `🔎 meetings index has ${
+                    meetingsResult.hits.total?.value || 0
+                } docs`
+            );
+            meetingsResult.hits.hits.forEach((h) => {
+                console.log(
+                    `   - meeting_id="${h._source.meeting_id}" → uuid="${h._source.meeting_uuid}"`
+                );
+            });
+        } catch (meetingsErr) {
+            console.log(
+                `🔎 meetings index query failed: ${meetingsErr.message}`
+            );
+        }
+
+        // Also check what speaker_context docs exist
+        try {
+            const allSpeakers = await esClient.search({
+                index: 'speaker_context',
+                body: {
+                    query: { match_all: {} },
+                    size: 5,
+                    _source: ['meeting_id', 'speaker_name'],
+                },
+            });
+            console.log(
+                `🔎 speaker_context index has ${
+                    allSpeakers.hits.total?.value || 0
+                } total docs`
+            );
+            allSpeakers.hits.hits.forEach((h) => {
+                console.log(
+                    `   - speaker="${h._source.speaker_name}" meeting_id="${h._source.meeting_id}"`
+                );
+            });
+        } catch (spkErr) {
+            console.log(`🔎 speaker_context query failed: ${spkErr.message}`);
+        }
+
+        console.log(`========== END SPEAKERS REQUEST ==========\n`);
         res.json({ meeting_id: meetingId, uuid: queryId, speakers });
     } catch (e) {
+        console.error(`🔎 SPEAKERS REQUEST ERROR:`, e.message);
         next(handleError(e));
     }
 });

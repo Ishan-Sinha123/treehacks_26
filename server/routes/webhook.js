@@ -146,7 +146,7 @@ function wireBufferEvents(meetingId) {
 router.post('/', async (req, res) => {
     const { event, payload } = req.body;
 
-    dbg(`Webhook received: ${event}`);
+    console.log(`🌐 WEBHOOK received: event="${event}"`);
 
     // Handle Zoom URL validation challenge
     if (event === 'endpoint.url_validation' && payload?.plainToken) {
@@ -155,7 +155,7 @@ router.post('/', async (req, res) => {
             .update(payload.plainToken)
             .digest('hex');
 
-        dbg('URL validation challenge responded');
+        console.log('🌐 URL validation challenge responded');
         return res.json({
             plainToken: payload.plainToken,
             encryptedToken: hash,
