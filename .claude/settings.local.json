@@ -7,7 +7,8 @@
         "WebFetch(domain:github.com)",
         "WebFetch(domain:developers.zoom.us)",
         "WebFetch(domain:devforum.zoom.us)",
-        "WebFetch(domain:bulma.io)"
+        "WebFetch(domain:bulma.io)",
+        "Bash(ls:*)"
     ]
   }
 }

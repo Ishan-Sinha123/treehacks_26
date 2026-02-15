@@ -1,36 +1,55 @@
 extends layout
 include mixins/prompt-install
+include mixins/chat-interface
 
 block content
     if isZoom
         // Sidebar.
         .content.m-4#main
             h1= title
-            button.button.is-primary.hidden#toggle-view Toggle View
+            button.button.is-primary.is-hidden#toggle-view Toggle View
+            .mt-5
+                +chat-interface(chatTarget, chatHistory)
 
         // Immersive view.
-        .content.hidden.m-4.mr-6#immersive
+        .content.is-hidden.m-4.mr-6#immersive
             .fixed-grid.has-4-cols
                 .grid
                     // Names
                     .cell
-                        strong#participant-1-name Participant 1
+                        button.button.is-fullwidth#participant-1-name Participant 1
                     .cell
-                        strong#participant-2-name Participant 2
+                        button.button.is-fullwidth#participant-2-name Participant 2
                     .cell
-                        strong#participant-3-name Participant 3
+                        button.button.is-fullwidth#participant-3-name Participant 3
                     .cell
-                        strong#participant-4-name Participant 4
+                        button.button.is-fullwidth#participant-4-name Participant 4
 
                     // Local contexts
                     .cell
-                        h4= participantContexts['user1']
+                        button.button.is-small.is-fullwidth#show-participant-1-context Show Context
+                        .is-hidden#user-1-context
+                            button.button.is-small.is-fullwidth#hide-participant-1-context Hide Context
+                            br
+                            h4= participantContexts['user1']
                     .cell
-                        h4= participantContexts['user2']
+                        button.button.is-small.is-fullwidth#show-participant-2-context Show Context
+                        .is-hidden#user-2-context
+                            button.button.is-small.is-fullwidth#hide-participant-2-context Hide Context
+                            br
+                            h4= participantContexts['user2']
                     .cell
-                        h4= participantContexts['user3']
+                        button.button.is-small.is-fullwidth#show-participant-3-context Show Context
+                        .is-hidden#user-3-context
+                            button.button.is-small.is-fullwidth#hide-participant-3-context Hide Context
+                            br
+                            h4= participantContexts['user3']
                     .cell
-                        h4= participantContexts['user4']
+                        button.button.is-small.is-fullwidth#show-participant-4-context Show Context
+                        .is-hidden#user-4-context
+                            button.button.is-small.is-fullwidth#hide-participant-4-context Hide Context
+                            br
+                            h4= participantContexts['user4']
             br
             br
             // Conversation timeline.

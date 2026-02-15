@@ -68,6 +68,15 @@ router.get('/', async (req, res, next) => {
                 'More concepts about things',
                 'Something else',
             ],
+            chatHistory: [
+                'What did Kenneth say about AI?',
+                'Kenneth said that AI is a powerful tool that can be used to enhance our products, but we need to be careful about data privacy and security.',
+                'Why did Kenneth say that?',
+                'Kenneth is concerned about data privacy and security because LLMs often require large amounts of data to train, and there is a risk that sensitive information could be exposed if not handled properly.',
+                'What are some ways we can mitigate those risks?',
+                'We can mitigate those risks by implementing strong data encryption, using anonymized data for training, and ensuring that we have robust access controls in place.',
+            ],
+            chatTarget: 'Your',
         });
     } catch (e) {
         next(handleError(e));
@@ -83,6 +92,31 @@ router.get('/install', session, async (req, res) => {
     req.session.state = state;
     req.session.verifier = verifier;
     res.redirect(url.href);
+});
+
+/*
+ * Chat Route - Handle chat messages
+ */
+router.post('/chat', async (req, res, next) => {
+    try {
+        sanitize(req);
+
+        const { message } = req.body;
+
+        // Validate message
+        if (!message || typeof message !== 'string' || message.trim() === '') {
+            return res
+                .status(400)
+                .json({ success: false, error: 'Message is required' });
+        }
+
+        // Placeholder response (future: integrate LLM/logic)
+        const response = `You said: "${message}". This is a placeholder response.`;
+
+        return res.json({ success: true, response });
+    } catch (e) {
+        next(handleError(e));
+    }
 });
 
 export default router;

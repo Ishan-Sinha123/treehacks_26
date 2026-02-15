@@ -3,11 +3,15 @@ import zoomSdk from '@zoom/appssdk';
 // State
 let participants = [];
 let inImmersiveView = false;
+let isChatProcessing = false;
 
 // Get components
 const mainContent = document.getElementById('main');
 const toggleButton = document.getElementById('toggle-view');
 const immersiveContainer = document.getElementById('immersive');
+const chatInput = document.getElementById('chat-input');
+const chatSubmit = document.getElementById('chat-submit');
+const chatMessages = document.getElementById('chat-messages');
 
 const participant1Name = document.getElementById('participant-1-name');
 const participant2Name = document.getElementById('participant-2-name');
@@ -19,6 +23,53 @@ const participantNames = [
     participant3Name,
     participant4Name,
 ];
+
+// Context buttons and containers
+const showContextButtons = [
+    document.getElementById('show-participant-1-context'),
+    document.getElementById('show-participant-2-context'),
+    document.getElementById('show-participant-3-context'),
+    document.getElementById('show-participant-4-context'),
+];
+
+const hideContextButtons = [
+    document.getElementById('hide-participant-1-context'),
+    document.getElementById('hide-participant-2-context'),
+    document.getElementById('hide-participant-3-context'),
+    document.getElementById('hide-participant-4-context'),
+];
+
+const contextContainers = [
+    document.getElementById('user-1-context'),
+    document.getElementById('user-2-context'),
+    document.getElementById('user-3-context'),
+    document.getElementById('user-4-context'),
+];
+
+/**
+ * Initialize context toggle buttons
+ */
+function initializeContextToggle() {
+    // Set up show button listeners
+    for (let i = 0; i < showContextButtons.length; i++) {
+        if (showContextButtons[i] && contextContainers[i]) {
+            showContextButtons[i].addEventListener('click', () => {
+                contextContainers[i].classList.remove('is-hidden');
+                showContextButtons[i].classList.add('is-hidden');
+            });
+        }
+    }
+
+    // Set up hide button listeners
+    for (let i = 0; i < hideContextButtons.length; i++) {
+        if (hideContextButtons[i] && contextContainers[i]) {
+            hideContextButtons[i].addEventListener('click', () => {
+                contextContainers[i].classList.add('is-hidden');
+                showContextButtons[i].classList.remove('is-hidden');
+            });
+        }
+    }
+}
 
 // Initialize app
 (async () => {
@@ -47,13 +98,17 @@ const participantNames = [
 
             const userContext = await zoomSdk.getUserContext();
             if (userContext.role === 'host') {
-                toggleButton.classList.remove('hidden');
+                toggleButton.classList.remove('is-hidden');
                 toggleButton.addEventListener('click', toggleImmersiveView);
+                initializeChat();
             }
         } else if (runningContext === 'inImmersive') {
             // IMMERSIVE MODE
-            mainContent.classList.add('hidden');
-            immersiveContainer.classList.remove('hidden');
+            mainContent.classList.add('is-hidden');
+            immersiveContainer.classList.remove('is-hidden');
+
+            // Initialize context toggle buttons
+            initializeContextToggle();
 
             // Get and draw participants
             const response = await zoomSdk.getMeetingParticipants();
@@ -180,4 +235,110 @@ async function handleParticipantChange(event) {
 async function handleResize() {
     console.log('Window resized, redrawing participants');
     await drawParticipants();
+}
+
+/**
+ * Initialize chat interface
+ */
+function initializeChat() {
+    if (!chatInput || !chatSubmit || !chatMessages) {
+        console.error('Chat elements not found');
+        return;
+    }
+
+    // Add click handler on submit button
+    chatSubmit.addEventListener('click', handleChatSubmit);
+
+    // Add enter key handler on input field
+    chatInput.addEventListener('keypress', (event) => {
+        if (event.key === 'Enter') {
+            handleChatSubmit();
+        }
+    });
+}
+
+/**
+ * Handle chat message submission
+ */
+async function handleChatSubmit() {
+    const message = chatInput.value.trim();
+
+    // Don't submit empty messages
+    if (!message || isChatProcessing) {
+        return;
+    }
+
+    try {
+        // Disable input/button
+        isChatProcessing = true;
+        chatInput.disabled = true;
+        chatSubmit.disabled = true;
+
+        // Add user message to UI immediately
+        addMessageToUI(message, true);
+
+        // Clear input field
+        chatInput.value = '';
+
+        // Send to backend
+        const response = await fetch('/chat', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ message }),
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            // Add agent response to UI
+            addMessageToUI(data.response, false);
+        } else {
+            console.error('Chat error:', data.error);
+            addMessageToUI(
+                'Sorry, there was an error processing your message.',
+                false
+            );
+        }
+    } catch (error) {
+        console.error('Failed to send chat message:', error);
+        addMessageToUI(
+            'Sorry, there was an error processing your message.',
+            false
+        );
+    } finally {
+        // Re-enable input/button
+        isChatProcessing = false;
+        chatInput.disabled = false;
+        chatSubmit.disabled = false;
+        chatInput.focus();
+    }
+}
+
+/**
+ * Add a message to the chat UI
+ * @param {string} message - The message text
+ * @param {boolean} isUser - True if message is from user, false if from agent
+ */
+function addMessageToUI(message, isUser) {
+    // Create wrapper div
+    const wrapper = document.createElement('div');
+    wrapper.className = isUser
+        ? 'message-wrapper user-message is-flex is-justify-content-flex-end'
+        : 'message-wrapper agent-message';
+
+    // Create box with message text
+    const box = document.createElement('div');
+    box.className = 'box';
+    const paragraph = document.createElement('p');
+    paragraph.textContent = message;
+    box.appendChild(paragraph);
+
+    // Append to wrapper and then to messages container
+    wrapper.appendChild(box);
+    chatMessages.appendChild(wrapper);
+
+    // Auto-scroll to bottom
+    chatMessages.scrollTop = chatMessages.scrollHeight;
 }
