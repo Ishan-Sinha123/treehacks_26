@@ -13,3 +13,45 @@
 #timeline {
     white-space: nowrap;
 }
+
+/* Chat interface styles */
+#chat-container {
+    max-width: 600px;
+}
+
+#chat-messages {
+    height: 300px;
+    overflow-y: auto;
+    border: 1px solid #dbdbdb;
+    border-radius: 6px;
+    background-color: #f5f5f5;
+    padding: 1rem;
+}
+
+.message-wrapper {
+    margin-bottom: 0.75rem;
+}
+
+.message-wrapper .box {
+    padding: 0.75rem 1rem;
+    word-wrap: break-word;
+    max-width: 80%;
+    margin: 0;
+}
+
+.message-wrapper.user-message .box {
+    background-color: hsl(171, 100%, 41%);
+    color: white;
+    border-radius: 18px 18px 4px 18px;
+}
+
+.message-wrapper.agent-message .box {
+    background-color: white;
+    border-radius: 18px 18px 18px 4px;
+}
+
+#chat-input:disabled,
+#chat-submit:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}

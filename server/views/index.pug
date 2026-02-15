@@ -1,5 +1,6 @@
 extends layout
 include mixins/prompt-install
+include mixins/chat-interface
 
 block content
     if isZoom
@@ -7,6 +8,8 @@ block content
         .content.m-4#main
             h1= title
             button.button.is-primary.hidden#toggle-view Toggle View
+            .mt-5
+                +chat-interface(chatTarget, chatHistory)
 
         // Immersive view.
         .content.hidden.m-4.mr-6#immersive

@@ -94,4 +94,29 @@ router.get('/install', session, async (req, res) => {
     res.redirect(url.href);
 });
 
+/*
+ * Chat Route - Handle chat messages
+ */
+router.post('/chat', async (req, res, next) => {
+    try {
+        sanitize(req);
+
+        const { message } = req.body;
+
+        // Validate message
+        if (!message || typeof message !== 'string' || message.trim() === '') {
+            return res
+                .status(400)
+                .json({ success: false, error: 'Message is required' });
+        }
+
+        // Placeholder response (future: integrate LLM/logic)
+        const response = `You said: "${message}". This is a placeholder response.`;
+
+        return res.json({ success: true, response });
+    } catch (e) {
+        next(handleError(e));
+    }
+});
+
 export default router;

@@ -3,11 +3,15 @@ import zoomSdk from '@zoom/appssdk';
 // State
 let participants = [];
 let inImmersiveView = false;
+let isChatProcessing = false;
 
 // Get components
 const mainContent = document.getElementById('main');
 const toggleButton = document.getElementById('toggle-view');
 const immersiveContainer = document.getElementById('immersive');
+const chatInput = document.getElementById('chat-input');
+const chatSubmit = document.getElementById('chat-submit');
+const chatMessages = document.getElementById('chat-messages');
 
 const participant1Name = document.getElementById('participant-1-name');
 const participant2Name = document.getElementById('participant-2-name');
@@ -49,6 +53,7 @@ const participantNames = [
             if (userContext.role === 'host') {
                 toggleButton.classList.remove('hidden');
                 toggleButton.addEventListener('click', toggleImmersiveView);
+                initializeChat();
             }
         } else if (runningContext === 'inImmersive') {
             // IMMERSIVE MODE
@@ -180,4 +185,110 @@ async function handleParticipantChange(event) {
 async function handleResize() {
     console.log('Window resized, redrawing participants');
     await drawParticipants();
+}
+
+/**
+ * Initialize chat interface
+ */
+function initializeChat() {
+    if (!chatInput || !chatSubmit || !chatMessages) {
+        console.error('Chat elements not found');
+        return;
+    }
+
+    // Add click handler on submit button
+    chatSubmit.addEventListener('click', handleChatSubmit);
+
+    // Add enter key handler on input field
+    chatInput.addEventListener('keypress', (event) => {
+        if (event.key === 'Enter') {
+            handleChatSubmit();
+        }
+    });
+}
+
+/**
+ * Handle chat message submission
+ */
+async function handleChatSubmit() {
+    const message = chatInput.value.trim();
+
+    // Don't submit empty messages
+    if (!message || isChatProcessing) {
+        return;
+    }
+
+    try {
+        // Disable input/button
+        isChatProcessing = true;
+        chatInput.disabled = true;
+        chatSubmit.disabled = true;
+
+        // Add user message to UI immediately
+        addMessageToUI(message, true);
+
+        // Clear input field
+        chatInput.value = '';
+
+        // Send to backend
+        const response = await fetch('/chat', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ message }),
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            // Add agent response to UI
+            addMessageToUI(data.response, false);
+        } else {
+            console.error('Chat error:', data.error);
+            addMessageToUI(
+                'Sorry, there was an error processing your message.',
+                false
+            );
+        }
+    } catch (error) {
+        console.error('Failed to send chat message:', error);
+        addMessageToUI(
+            'Sorry, there was an error processing your message.',
+            false
+        );
+    } finally {
+        // Re-enable input/button
+        isChatProcessing = false;
+        chatInput.disabled = false;
+        chatSubmit.disabled = false;
+        chatInput.focus();
+    }
+}
+
+/**
+ * Add a message to the chat UI
+ * @param {string} message - The message text
+ * @param {boolean} isUser - True if message is from user, false if from agent
+ */
+function addMessageToUI(message, isUser) {
+    // Create wrapper div
+    const wrapper = document.createElement('div');
+    wrapper.className = isUser
+        ? 'message-wrapper user-message is-flex is-justify-content-flex-end'
+        : 'message-wrapper agent-message';
+
+    // Create box with message text
+    const box = document.createElement('div');
+    box.className = 'box';
+    const paragraph = document.createElement('p');
+    paragraph.textContent = message;
+    box.appendChild(paragraph);
+
+    // Append to wrapper and then to messages container
+    wrapper.appendChild(box);
+    chatMessages.appendChild(wrapper);
+
+    // Auto-scroll to bottom
+    chatMessages.scrollTop = chatMessages.scrollHeight;
 }
