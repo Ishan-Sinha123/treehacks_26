@@ -1,4 +1,4 @@
-- type: pserv
+  - type: pserv
     name: zoom-elasticsearch
     env: docker
     dockerfilePath: ./elasticsearch/Dockerfile
@@ -15,3 +15,19 @@
         value: "-Xms512m -Xmx512m"
       - key: bootstrap.memory_lock
         value: "false"
+
+  - type: web
+    name: zoom-kibana
+    env: docker
+    dockerfilePath: ./kibana/Dockerfile
+    envVars:
+      - key: ELASTICSEARCH_HOSTS
+        value: http://zoom-elasticsearch:9200
+      - key: SERVER_NAME
+        value: zoom-kibana
+      - key: SERVER_HOST
+        value: 0.0.0.0
+      - key: ELASTICSEARCH_USERNAME
+        value: ""
+      - key: ELASTICSEARCH_PASSWORD
+        value: ""
