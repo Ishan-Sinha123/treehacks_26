@@ -165,6 +165,31 @@ router.post('/semantic-search', async (req, res, next) => {
 });
 
 /**
+ * Get all speakers for a meeting
+ * GET /api/meeting/:meetingId/speakers
+ */
+router.get('/meeting/:meetingId/speakers', async (req, res, next) => {
+    try {
+        sanitize(req);
+        const { meetingId } = req.params;
+
+        const result = await esClient.search({
+            index: 'speaker_context',
+            body: {
+                query: { term: { meeting_id: meetingId } },
+                sort: [{ last_updated: 'desc' }],
+                size: 50,
+            },
+        });
+
+        const speakers = result.hits.hits.map((hit) => hit._source);
+        res.json({ meeting_id: meetingId, speakers });
+    } catch (e) {
+        next(handleError(e));
+    }
+});
+
+/**
  * Get all chunks for a meeting (debugging/demo)
  * GET /api/chunks/:meetingId
  */

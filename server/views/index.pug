@@ -31,32 +31,30 @@ block content
                         .is-hidden#user-1-context
                             button.button.is-small.is-fullwidth#hide-participant-1-context Hide Context
                             br
-                            h4= participantContexts['user1']
+                            h4#participant-1-summary Waiting for data...
                     .cell
                         button.button.is-small.is-fullwidth#show-participant-2-context Show Context
                         .is-hidden#user-2-context
                             button.button.is-small.is-fullwidth#hide-participant-2-context Hide Context
                             br
-                            h4= participantContexts['user2']
+                            h4#participant-2-summary Waiting for data...
                     .cell
                         button.button.is-small.is-fullwidth#show-participant-3-context Show Context
                         .is-hidden#user-3-context
                             button.button.is-small.is-fullwidth#hide-participant-3-context Hide Context
                             br
-                            h4= participantContexts['user3']
+                            h4#participant-3-summary Waiting for data...
                     .cell
                         button.button.is-small.is-fullwidth#show-participant-4-context Show Context
                         .is-hidden#user-4-context
                             button.button.is-small.is-fullwidth#hide-participant-4-context Hide Context
                             br
-                            h4= participantContexts['user4']
+                            h4#participant-4-summary Waiting for data...
             br
             br
             // Conversation timeline.
             .is-flex.is-justify-content-end.is-flex-wrap-nowrap.is-overflow-x-auto#timeline
-                each item in conversationTimeline
-                    .box.content.ml-3
-                        p= item
+                // Populated dynamically by JS
                 // Extra spacer for the end.
                 div
 
