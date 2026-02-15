@@ -45,6 +45,7 @@ export async function initializeIndices() {
             mappings: {
                 properties: {
                     meeting_id: { type: 'keyword' },
+                    meeting_uuid: { type: 'keyword' },
                     start_time: { type: 'date' },
                     end_time: { type: 'date' },
                     participants: { type: 'keyword' },

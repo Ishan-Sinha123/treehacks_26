@@ -24,7 +24,7 @@ router.get('/speaker/:speakerId/context', async (req, res, next) => {
         }
 
         // Translate numeric meeting ID → UUID
-        const uuid = getMeetingUuid(meetingId);
+        const uuid = await getMeetingUuid(meetingId);
         const queryId = uuid || meetingId;
 
         const context = await getSpeakerContext(speakerId, queryId);
@@ -62,7 +62,7 @@ router.post('/chat/:speakerId', async (req, res, next) => {
         }
 
         // Translate numeric meeting ID → UUID
-        const uuid = getMeetingUuid(meetingId);
+        const uuid = await getMeetingUuid(meetingId);
         const queryId = uuid || meetingId;
 
         // 1. Get speaker summary from speaker_context
@@ -141,7 +141,7 @@ router.post('/semantic-search', async (req, res, next) => {
         }
 
         // Translate numeric meeting ID → UUID if provided
-        const uuid = meetingId ? getMeetingUuid(meetingId) : null;
+        const uuid = meetingId ? await getMeetingUuid(meetingId) : null;
         const queryId = uuid || meetingId;
 
         try {
@@ -187,7 +187,7 @@ router.get('/meeting/:meetingId/speakers', async (req, res, next) => {
         const { meetingId } = req.params;
 
         // Frontend sends numeric meeting ID, ES stores UUID — translate
-        const uuid = getMeetingUuid(meetingId);
+        const uuid = await getMeetingUuid(meetingId);
         const queryId = uuid || meetingId;
         console.log(
             `🔎 GET /api/meeting/${meetingId}/speakers → querying ES with meeting_id="${queryId}" (translated: ${!!uuid})`
@@ -222,7 +222,7 @@ router.get('/chunks/:meetingId', async (req, res, next) => {
         const { meetingId } = req.params;
 
         // Translate numeric meeting ID → UUID
-        const uuid = getMeetingUuid(meetingId);
+        const uuid = await getMeetingUuid(meetingId);
         const queryId = uuid || meetingId;
 
         const result = await esClient.search({

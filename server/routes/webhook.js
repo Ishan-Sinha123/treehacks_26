@@ -3,7 +3,7 @@ import crypto from 'crypto';
 import debug from 'debug';
 import { appName, zmSecretToken, zoomApp } from '../../config.js';
 import { RTMSManager } from '../rtmsManager/index.js';
-import { insertTranscriptChunk } from '../helpers/elasticsearch.js';
+import { insertTranscriptChunk, esClient } from '../helpers/elasticsearch.js';
 import {
     getOrCreateBuffer,
     destroyBuffer,
@@ -15,19 +15,48 @@ const dbg = debug(`${appName}:webhook`);
 
 let rtmsInitialized = false;
 
-// Map numeric meeting ID → UUID (populated when RTMS starts)
+// Map numeric meeting ID → UUID (in-memory cache, backed by ES)
 const meetingIdToUuid = new Map();
 
-export function getMeetingUuid(numericId) {
-    const uuid = meetingIdToUuid.get(String(numericId));
-    console.log(
-        `🔍 getMeetingUuid: "${numericId}" → ${
-            uuid || 'NOT FOUND'
-        } (map size: ${meetingIdToUuid.size}, keys: [${[
-            ...meetingIdToUuid.keys(),
-        ].join(', ')}])`
-    );
-    return uuid;
+export async function getMeetingUuid(numericId) {
+    const key = String(numericId);
+
+    // 1. Check in-memory cache
+    if (meetingIdToUuid.has(key)) {
+        console.log(
+            `🔍 getMeetingUuid: "${key}" → ${meetingIdToUuid.get(
+                key
+            )} (from cache)`
+        );
+        return meetingIdToUuid.get(key);
+    }
+
+    // 2. Fall back to ES meetings index
+    try {
+        const result = await esClient.search({
+            index: 'meetings',
+            body: {
+                query: { term: { meeting_id: key } },
+                size: 1,
+            },
+        });
+
+        const hit = result.hits.hits[0];
+        if (hit?._source?.meeting_uuid) {
+            const uuid = hit._source.meeting_uuid;
+            meetingIdToUuid.set(key, uuid); // cache it
+            console.log(`🔍 getMeetingUuid: "${key}" → ${uuid} (from ES)`);
+            return uuid;
+        }
+    } catch (err) {
+        console.warn(
+            `🔍 getMeetingUuid: ES lookup failed for "${key}":`,
+            err.message
+        );
+    }
+
+    console.log(`🔍 getMeetingUuid: "${key}" → NOT FOUND (cache + ES)`);
+    return null;
 }
 
 /**
@@ -155,8 +184,28 @@ router.post('/', async (req, res) => {
         if (numericId && uuid) {
             meetingIdToUuid.set(String(numericId), uuid);
             console.log(
-                `📌 Meeting ID mapping stored: "${numericId}" → "${uuid}"`
+                `📌 Meeting ID mapping cached: "${numericId}" → "${uuid}"`
             );
+
+            // Persist to ES meetings index (survives server restarts)
+            try {
+                await esClient.index({
+                    index: 'meetings',
+                    id: String(numericId),
+                    body: {
+                        meeting_id: String(numericId),
+                        meeting_uuid: uuid,
+                        start_time: new Date().toISOString(),
+                        status: 'active',
+                    },
+                });
+                console.log(`📌 Meeting ID mapping persisted to ES`);
+            } catch (esErr) {
+                console.error(
+                    '❌ Failed to persist meeting mapping to ES:',
+                    esErr.message
+                );
+            }
         } else {
             console.log(
                 `⚠️ RTMS started — missing fields! meeting_id=${numericId}, meeting_uuid=${uuid}`

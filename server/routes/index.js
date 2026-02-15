@@ -82,7 +82,7 @@ router.post('/chat', async (req, res, next) => {
         }
 
         // Translate numeric meeting ID → UUID for ES queries
-        const uuid = getMeetingUuid(meetingId);
+        const uuid = await getMeetingUuid(meetingId);
         const queryId = uuid || meetingId;
         console.log(
             `💬 POST /chat: meetingId="${meetingId}" → queryId="${queryId}" (translated: ${!!uuid})`
