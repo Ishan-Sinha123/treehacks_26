@@ -189,6 +189,9 @@ router.get('/meeting/:meetingId/speakers', async (req, res, next) => {
         // Frontend sends numeric meeting ID, ES stores UUID — translate
         const uuid = getMeetingUuid(meetingId);
         const queryId = uuid || meetingId;
+        console.log(
+            `🔎 GET /api/meeting/${meetingId}/speakers → querying ES with meeting_id="${queryId}" (translated: ${!!uuid})`
+        );
 
         const result = await esClient.search({
             index: 'speaker_context',
@@ -200,6 +203,9 @@ router.get('/meeting/:meetingId/speakers', async (req, res, next) => {
         });
 
         const speakers = result.hits.hits.map((hit) => hit._source);
+        console.log(
+            `🔎 GET /api/meeting/${meetingId}/speakers → found ${speakers.length} speakers`
+        );
         res.json({ meeting_id: meetingId, uuid: queryId, speakers });
     } catch (e) {
         next(handleError(e));

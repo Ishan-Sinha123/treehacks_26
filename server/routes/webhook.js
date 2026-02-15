@@ -19,7 +19,15 @@ let rtmsInitialized = false;
 const meetingIdToUuid = new Map();
 
 export function getMeetingUuid(numericId) {
-    return meetingIdToUuid.get(String(numericId));
+    const uuid = meetingIdToUuid.get(String(numericId));
+    console.log(
+        `🔍 getMeetingUuid: "${numericId}" → ${
+            uuid || 'NOT FOUND'
+        } (map size: ${meetingIdToUuid.size}, keys: [${[
+            ...meetingIdToUuid.keys(),
+        ].join(', ')}])`
+    );
+    return uuid;
 }
 
 /**
@@ -49,6 +57,9 @@ async function ensureRTMSInitialized() {
         );
 
         const meetingId = String(eventData.meetingId);
+        console.log(
+            `📝 RTMSManager eventData.meetingId = "${meetingId}" (type: ${typeof eventData.meetingId})`
+        );
         wireBufferEvents(meetingId);
         const buffer = getOrCreateBuffer(meetingId);
 
@@ -130,18 +141,27 @@ router.post('/', async (req, res) => {
 
     // Forward event to RTMSManager — it handles the RTMS connection lifecycle
     if (event === 'meeting.rtms_started') {
+        // Log the full payload.object so we can see all available fields
+        console.log(
+            '📦 meeting.rtms_started payload.object keys:',
+            Object.keys(payload?.object || {}),
+            JSON.stringify(payload?.object, null, 2)
+        );
+
         // Capture numeric meeting ID → UUID mapping
         // Payload fields: payload.object.meeting_id (numeric), payload.object.meeting_uuid (base64)
         const numericId = payload?.object?.meeting_id;
         const uuid = payload?.object?.meeting_uuid;
         if (numericId && uuid) {
             meetingIdToUuid.set(String(numericId), uuid);
-            console.log(`📌 Meeting ID mapping: ${numericId} → ${uuid}`);
+            console.log(
+                `📌 Meeting ID mapping stored: "${numericId}" → "${uuid}"`
+            );
         } else {
             console.log(
-                '⚠️ RTMS started payload:',
-                JSON.stringify(payload?.object, null, 2)
+                `⚠️ RTMS started — missing fields! meeting_id=${numericId}, meeting_uuid=${uuid}`
             );
+            console.log('⚠️ Full payload:', JSON.stringify(payload, null, 2));
         }
         dbg(`Forwarding ${event} to RTMSManager`);
         RTMSManager.handleEvent(event, payload);
