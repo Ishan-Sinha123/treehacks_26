@@ -1,25 +1,81 @@
 import express from 'express';
 import crypto from 'crypto';
-import rtms from '@zoom/rtms';
 import debug from 'debug';
 import { appName, zmSecretToken, zoomApp } from '../../config.js';
+import { RTMSManager } from '../rtmsManager/index.js';
 import { bulkInsertSegments } from '../helpers/elasticsearch.js';
 
 const router = express.Router();
 const dbg = debug(`${appName}:webhook`);
 
-// Track active RTMS clients by stream ID
-const activeClients = new Map();
+let rtmsInitialized = false;
 
-// Set RTMS SDK env vars from our config
-process.env.ZM_RTMS_CLIENT = zoomApp.clientId;
-process.env.ZM_RTMS_SECRET = zoomApp.clientSecret;
+/**
+ * Initialize RTMSManager singleton on first use
+ */
+async function ensureRTMSInitialized() {
+    if (rtmsInitialized) return;
+
+    await RTMSManager.init({
+        credentials: {
+            meeting: {
+                clientId: zoomApp.clientId,
+                clientSecret: zoomApp.clientSecret,
+                secretToken: zmSecretToken,
+            },
+        },
+        mediaTypes: RTMSManager.MEDIA.TRANSCRIPT,
+        logging: 'info',
+    });
+
+    // Batch accumulator for ES inserts
+    let batch = [];
+    let batchTimer = null;
+
+    function flushBatch() {
+        if (batch.length === 0) return;
+        const toInsert = [...batch];
+        batch = [];
+        dbg(`Flushing ${toInsert.length} segments to Elasticsearch`);
+        bulkInsertSegments(toInsert).catch((err) => {
+            console.error('Error inserting segments:', err);
+        });
+    }
+
+    // Listen for transcript events from RTMSManager
+    RTMSManager.on('transcript', (eventData) => {
+        dbg(
+            `Transcript from ${eventData.userName || 'Unknown'}: ${(
+                eventData.text || ''
+            ).substring(0, 50)}...`
+        );
+
+        const segment = {
+            meeting_id: eventData.meetingId,
+            speaker_id: String(eventData.userId || 'unknown'),
+            speaker_name: eventData.userName || 'Unknown',
+            text: eventData.text,
+            timestamp: new Date(eventData.timestamp || Date.now()),
+            segment_id: `${eventData.meetingId}-${Date.now()}-${Math.random()
+                .toString(36)
+                .substr(2, 9)}`,
+        };
+
+        batch.push(segment);
+
+        if (batchTimer) clearTimeout(batchTimer);
+        batchTimer = setTimeout(flushBatch, 1000);
+    });
+
+    rtmsInitialized = true;
+    dbg('RTMSManager initialized for transcript capture');
+}
 
 /**
  * POST /webhook
  * Receives Zoom webhook events (RTMS start/stop, URL validation)
  */
-router.post('/', (req, res) => {
+router.post('/', async (req, res) => {
     const { event, payload } = req.body;
 
     dbg(`Webhook received: ${event}`);
@@ -41,100 +97,14 @@ router.post('/', (req, res) => {
     // Respond immediately to avoid Zoom retries
     res.status(200).json({ status: 'accepted' });
 
-    // Handle RTMS events
-    if (event === 'meeting.rtms_started') {
-        handleRTMSStarted(payload);
-    } else if (event === 'meeting.rtms_stopped') {
-        handleRTMSStopped(payload);
+    // Initialize RTMSManager if needed
+    await ensureRTMSInitialized();
+
+    // Forward event to RTMSManager — it handles the RTMS connection lifecycle
+    if (event === 'meeting.rtms_started' || event === 'meeting.rtms_stopped') {
+        dbg(`Forwarding ${event} to RTMSManager`);
+        RTMSManager.handleEvent(event, payload);
     }
 });
-
-/**
- * Handle meeting.rtms_started webhook
- * Creates an RTMS client and connects to receive transcript data
- */
-function handleRTMSStarted(payload) {
-    const { meeting_uuid, rtms_stream_id } = payload;
-    dbg(`RTMS started for meeting: ${meeting_uuid}, stream: ${rtms_stream_id}`);
-
-    // Prevent duplicate connections
-    if (activeClients.has(rtms_stream_id)) {
-        dbg(`Stream ${rtms_stream_id} already active, skipping`);
-        return;
-    }
-
-    const client = new rtms.Client();
-    const batch = [];
-    let batchTimer = null;
-
-    function flushBatch() {
-        if (batch.length === 0) return;
-
-        const toInsert = [...batch];
-        batch.length = 0;
-
-        dbg(`Flushing ${toInsert.length} segments to Elasticsearch`);
-        bulkInsertSegments(toInsert).catch((err) => {
-            console.error('Error inserting segments:', err);
-        });
-    }
-
-    // Receive transcript data
-    client.onTranscriptData((data, timestamp, metadata) => {
-        const text = data.toString('utf8');
-        dbg(
-            `Transcript from ${
-                metadata.userName || 'Unknown'
-            }: ${text.substring(0, 50)}...`
-        );
-
-        const segment = {
-            meeting_id: meeting_uuid,
-            speaker_id: String(metadata.userId || 'unknown'),
-            speaker_name: metadata.userName || 'Unknown',
-            text,
-            timestamp: new Date(Number(timestamp)),
-            segment_id: `${meeting_uuid}-${Date.now()}-${Math.random()
-                .toString(36)
-                .substr(2, 9)}`,
-        };
-
-        batch.push(segment);
-
-        // Flush batch after 1 second of accumulation
-        if (batchTimer) clearTimeout(batchTimer);
-        batchTimer = setTimeout(flushBatch, 1000);
-    });
-
-    client.onJoinConfirm((reason) => {
-        dbg(`Joined RTMS session: ${reason}`);
-    });
-
-    client.onLeave((reason) => {
-        dbg(`Left RTMS session: ${reason}`);
-        flushBatch();
-        activeClients.delete(rtms_stream_id);
-    });
-
-    // Connect to RTMS with transcript media type
-    client.join(payload);
-    activeClients.set(rtms_stream_id, client);
-
-    dbg(`RTMS client connected for stream: ${rtms_stream_id}`);
-}
-
-/**
- * Handle meeting.rtms_stopped webhook
- */
-function handleRTMSStopped(payload) {
-    const { rtms_stream_id } = payload;
-    dbg(`RTMS stopped for stream: ${rtms_stream_id}`);
-
-    const client = activeClients.get(rtms_stream_id);
-    if (client) {
-        client.leave();
-        activeClients.delete(rtms_stream_id);
-    }
-}
 
 export default router;
