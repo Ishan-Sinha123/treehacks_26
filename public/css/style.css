@@ -20,7 +20,7 @@
 }
 
 #chat-messages {
-    height: 300px;
+    height: 400px;
     overflow-y: auto;
     border: 1px solid #dbdbdb;
     border-radius: 6px;
