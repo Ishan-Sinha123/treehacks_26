@@ -2,6 +2,7 @@ FROM docker.elastic.co/elasticsearch/elasticsearch:8.18.0
 
 # Disable X-Pack security for hackathon simplicity
 ENV xpack.security.enabled=false
+ENV xpack.license.self_generated.type=trial
 ENV discovery.type=single-node
 
 # Expose ports
