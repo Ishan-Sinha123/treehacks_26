@@ -3,6 +3,7 @@ import debug from 'debug';
 import { appName } from '../config.js';
 import { testConnection, initializeIndices } from './helpers/elasticsearch.js';
 import { setupInferenceEndpoints } from './helpers/setup-inference.js';
+import { initializeTools } from './helpers/agent-manager.js';
 
 const dbg = debug(`${appName}:http`);
 
@@ -28,6 +29,13 @@ export async function start(app, port) {
         console.log('🔄 Initializing Elasticsearch indices...');
         await initializeIndices();
         console.log('✅ Elasticsearch ready');
+
+        // Initialize Kibana Agent Builder tools (connector + shared tools)
+        try {
+            await initializeTools();
+        } catch (err) {
+            console.warn('⚠️  Agent network setup failed:', err.message);
+        }
     } else {
         console.warn(
             '⚠️  Elasticsearch not available - some features will be disabled'

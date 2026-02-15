@@ -5,6 +5,7 @@ let participants = [];
 let inImmersiveView = false;
 let isChatProcessing = false;
 let meetingId = null;
+let screenName = null;
 let pollInterval = null;
 
 // Get components
@@ -204,6 +205,8 @@ function startPolling() {
         if (runningContext === 'inMeeting') {
             // SIDEBAR MODE
             const userContext = await zoomSdk.getUserContext();
+            screenName = userContext.screenName || null;
+            console.log('Screen name:', screenName);
             if (userContext.role === 'host') {
                 try {
                     await zoomSdk.callZoomApi('startRTMS');
@@ -420,7 +423,7 @@ async function handleChatSubmit() {
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ message, meetingId }),
+            body: JSON.stringify({ message, speakerName: screenName }),
         });
 
         const data = await response.json();

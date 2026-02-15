@@ -71,6 +71,18 @@ export async function initializeIndices() {
             },
         },
         {
+            name: 'speaker_transcripts',
+            mappings: {
+                properties: {
+                    speaker_id: { type: 'keyword' },
+                    speaker_name: { type: 'keyword' },
+                    meeting_id: { type: 'keyword' },
+                    text: { type: 'text' },
+                    timestamp: { type: 'date' },
+                },
+            },
+        },
+        {
             name: 'speaker_context',
             mappings: {
                 properties: {
@@ -144,6 +156,25 @@ export async function insertTranscriptChunk(chunk) {
     } catch (error) {
         console.error('❌ Error inserting transcript chunk:', error);
         throw error;
+    }
+}
+
+// Insert a raw speaker utterance into speaker_transcripts
+export async function insertSpeakerTranscript(utterance) {
+    await indicesReadyPromise;
+    try {
+        await esClient.index({
+            index: 'speaker_transcripts',
+            body: {
+                speaker_id: utterance.speaker_id,
+                speaker_name: utterance.speaker_name,
+                meeting_id: utterance.meeting_id,
+                text: utterance.text,
+                timestamp: utterance.timestamp,
+            },
+        });
+    } catch (error) {
+        console.error('❌ Error inserting speaker transcript:', error.message);
     }
 }
 

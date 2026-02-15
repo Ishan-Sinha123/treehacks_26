@@ -46,6 +46,9 @@ export const anthropicApiKey = config.ANTHROPIC_API_KEY;
 export const jinaApiKey = config.JINA_API_KEY;
 // Zoom RTMS
 export const zmSecretToken = config.ZM_SECRET_TOKEN;
+// Kibana Agent Builder
+export const kibanaUrl = config.KIBANA_URL;
+export const kibanaApiKey = config.KIBANA_API_KEY;
 // require secrets are explicitly imported
 export default {
     appName,
@@ -55,4 +58,6 @@ export default {
     anthropicApiKey,
     jinaApiKey,
     zmSecretToken,
+    kibanaUrl,
+    kibanaApiKey,
 };

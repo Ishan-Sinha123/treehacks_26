@@ -3,12 +3,17 @@ import crypto from 'crypto';
 import debug from 'debug';
 import { appName, zmSecretToken, zoomApp } from '../../config.js';
 import { RTMSManager } from '../rtmsManager/index.js';
-import { insertTranscriptChunk, esClient } from '../helpers/elasticsearch.js';
+import {
+    insertTranscriptChunk,
+    insertSpeakerTranscript,
+    esClient,
+} from '../helpers/elasticsearch.js';
 import {
     getOrCreateBuffer,
     destroyBuffer,
 } from '../helpers/transcript-buffer.js';
 import { summarizeSpeaker } from '../helpers/summarizer.js';
+import { ensureAgentExists } from '../helpers/agent-manager.js';
 
 const router = express.Router();
 const dbg = debug(`${appName}:webhook`);
@@ -108,6 +113,10 @@ async function ensureRTMSInitialized() {
         );
 
         const meetingId = String(eventData.meetingId);
+        const speakerId = String(eventData.userId || 'unknown');
+        const speakerName = eventData.userName || 'Unknown';
+        const timestamp = new Date().toISOString();
+
         console.log(
             `📝 RTMSManager eventData.meetingId = "${meetingId}" (type: ${typeof eventData.meetingId})`
         );
@@ -115,11 +124,28 @@ async function ensureRTMSInitialized() {
         const buffer = getOrCreateBuffer(meetingId);
 
         buffer.append({
-            speakerId: String(eventData.userId || 'unknown'),
-            speakerName: eventData.userName || 'Unknown',
+            speakerId,
+            speakerName,
             text: eventData.text,
-            timestamp: new Date().toISOString(),
+            timestamp,
         });
+
+        // Write raw utterance to speaker_transcripts (agent knowledge base)
+        insertSpeakerTranscript({
+            speaker_id: speakerId,
+            speaker_name: speakerName,
+            meeting_id: meetingId,
+            text: eventData.text,
+            timestamp,
+        });
+
+        // Lazily create an agent for this speaker on first speech
+        ensureAgentExists(speakerId, speakerName).catch((err) =>
+            console.warn(
+                `⚠️  Agent creation deferred for ${speakerName}:`,
+                err.message
+            )
+        );
     });
 
     rtmsInitialized = true;
