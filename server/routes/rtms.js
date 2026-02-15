@@ -2,13 +2,48 @@ import express from 'express';
 import { WebSocketServer } from 'ws';
 import debug from 'debug';
 import { appName } from '../../config.js';
-import { bulkInsertSegments } from '../helpers/elasticsearch.js';
+import { insertTranscriptChunk } from '../helpers/elasticsearch.js';
+import {
+    getOrCreateBuffer,
+    destroyBuffer,
+} from '../helpers/transcript-buffer.js';
+import { summarizeSpeaker } from '../helpers/summarizer.js';
 
 const router = express.Router();
 const dbg = debug(`${appName}:rtms`);
 
-// Store active WebSocket connections
-const activeConnections = new Map();
+// Track which meetings have buffer events wired
+const wiredMeetings = new Set();
+
+function wireBufferEvents(meetingId) {
+    if (wiredMeetings.has(meetingId)) return;
+    wiredMeetings.add(meetingId);
+
+    const buffer = getOrCreateBuffer(meetingId);
+
+    buffer.on('chunk', async (chunkData) => {
+        try {
+            await insertTranscriptChunk(chunkData);
+        } catch (err) {
+            console.error('❌ Error inserting chunk:', err.message);
+        }
+    });
+
+    buffer.on('summarize', async (summaryData) => {
+        try {
+            const result = await summarizeSpeaker(summaryData);
+            console.log(
+                `📝 Speaker summary updated: ${
+                    summaryData.speakerName
+                }\n   Topics: ${result.topics.join(', ')}\n   Summary: ${
+                    result.summary
+                }`
+            );
+        } catch (err) {
+            console.error('❌ Error summarizing speaker:', err.message);
+        }
+    });
+}
 
 /**
  * Initialize WebSocket server for RTMS
@@ -30,13 +65,7 @@ export function initializeRTMSWebSocket(server) {
         }
 
         dbg(`✅ RTMS WebSocket connected for meeting: ${meetingId}`);
-
-        // Store connection
-        activeConnections.set(meetingId, {
-            ws,
-            batch: [],
-            batchTimer: null,
-        });
+        wireBufferEvents(meetingId);
 
         ws.on('message', async (data) => {
             try {
@@ -47,51 +76,18 @@ export function initializeRTMSWebSocket(server) {
                     }`
                 );
 
-                const connection = activeConnections.get(meetingId);
-                if (!connection) return;
-
-                // Add to batch
-                const segment = {
-                    meeting_id: meetingId,
-                    speaker_id: transcript.speaker_id || transcript.userId,
-                    speaker_name:
-                        transcript.speaker_name || transcript.userName,
+                const buffer = getOrCreateBuffer(meetingId);
+                buffer.append({
+                    speakerId:
+                        transcript.speaker_id ||
+                        String(transcript.userId || 'unknown'),
+                    speakerName:
+                        transcript.speaker_name ||
+                        transcript.userName ||
+                        'Unknown',
                     text: transcript.text,
-                    timestamp: new Date().toISOString(), // ✅ FIXED
-                    segment_id: `${meetingId}-${Date.now()}-${Math.random()
-                        .toString(36)
-                        .substr(2, 9)}`,
-                };
-
-                connection.batch.push(segment);
-
-                // Clear existing timer
-                if (connection.batchTimer) {
-                    clearTimeout(connection.batchTimer);
-                }
-
-                // Set new timer to flush batch after 1 second
-                connection.batchTimer = setTimeout(async () => {
-                    if (connection.batch.length > 0) {
-                        dbg(
-                            `📤 Flushing ${connection.batch.length} segments to Elasticsearch`
-                        );
-
-                        try {
-                            await bulkInsertSegments(connection.batch);
-                            dbg(
-                                `✅ Inserted ${connection.batch.length} segments`
-                            );
-
-                            // TODO: Trigger ES inference pipeline for summarization and embedding
-                            // This will be done via ES ingest pipeline once we configure inference endpoints
-                        } catch (error) {
-                            console.error('Error inserting segments:', error);
-                        }
-
-                        connection.batch = [];
-                    }
-                }, 1000);
+                    timestamp: new Date().toISOString(),
+                });
             } catch (error) {
                 console.error('Error processing RTMS message:', error);
             }
@@ -99,20 +95,8 @@ export function initializeRTMSWebSocket(server) {
 
         ws.on('close', () => {
             dbg(`🔌 RTMS WebSocket closed for meeting: ${meetingId}`);
-            const connection = activeConnections.get(meetingId);
-
-            if (connection) {
-                // Flush any remaining segments
-                if (connection.batch.length > 0) {
-                    bulkInsertSegments(connection.batch).catch(console.error);
-                }
-
-                if (connection.batchTimer) {
-                    clearTimeout(connection.batchTimer);
-                }
-
-                activeConnections.delete(meetingId);
-            }
+            destroyBuffer(meetingId);
+            wiredMeetings.delete(meetingId);
         });
 
         ws.on('error', (error) => {

@@ -3,7 +3,12 @@ import crypto from 'crypto';
 import debug from 'debug';
 import { appName, zmSecretToken, zoomApp } from '../../config.js';
 import { RTMSManager } from '../rtmsManager/index.js';
-import { bulkInsertSegments } from '../helpers/elasticsearch.js';
+import { insertTranscriptChunk } from '../helpers/elasticsearch.js';
+import {
+    getOrCreateBuffer,
+    destroyBuffer,
+} from '../helpers/transcript-buffer.js';
+import { summarizeSpeaker } from '../helpers/summarizer.js';
 
 const router = express.Router();
 const dbg = debug(`${appName}:webhook`);
@@ -28,26 +33,6 @@ async function ensureRTMSInitialized() {
         logging: 'info',
     });
 
-    // Batch accumulator for ES inserts
-    let batch = [];
-    let batchTimer = null;
-
-    function flushBatch() {
-        if (batch.length === 0) return;
-        const toInsert = [...batch];
-        batch = [];
-        console.log(`📤 Flushing ${toInsert.length} segments to Elasticsearch`);
-        bulkInsertSegments(toInsert)
-            .then(() => {
-                console.log(
-                    `✅ Successfully inserted ${toInsert.length} segments`
-                );
-            })
-            .catch((err) => {
-                console.error('❌ Error inserting segments:', err);
-            });
-    }
-
     // Listen for transcript events from RTMSManager
     RTMSManager.on('transcript', (eventData) => {
         console.log(
@@ -56,26 +41,55 @@ async function ensureRTMSInitialized() {
             }`
         );
 
-        const segment = {
-            meeting_id: eventData.meetingId,
-            speaker_id: String(eventData.userId || 'unknown'),
-            speaker_name: eventData.userName || 'Unknown',
+        const meetingId = String(eventData.meetingId);
+        wireBufferEvents(meetingId);
+        const buffer = getOrCreateBuffer(meetingId);
+
+        buffer.append({
+            speakerId: String(eventData.userId || 'unknown'),
+            speakerName: eventData.userName || 'Unknown',
             text: eventData.text,
-            timestamp: new Date().toISOString(), // ✅ FIXED
-            segment_id: `${eventData.meetingId}-${Date.now()}-${Math.random()
-                .toString(36)
-                .substr(2, 9)}`,
-        };
-
-        console.log(`➕ Added to batch (batch size: ${batch.length + 1})`);
-        batch.push(segment);
-
-        if (batchTimer) clearTimeout(batchTimer);
-        batchTimer = setTimeout(flushBatch, 1000);
+            timestamp: new Date().toISOString(),
+        });
     });
 
     rtmsInitialized = true;
     console.log('✅ RTMSManager initialized for transcript capture');
+}
+
+/**
+ * Wire buffer events for a meeting (idempotent — checks if already wired)
+ */
+const wiredMeetings = new Set();
+
+function wireBufferEvents(meetingId) {
+    if (wiredMeetings.has(meetingId)) return;
+    wiredMeetings.add(meetingId);
+
+    const buffer = getOrCreateBuffer(meetingId);
+
+    buffer.on('chunk', async (chunkData) => {
+        try {
+            await insertTranscriptChunk(chunkData);
+        } catch (err) {
+            console.error('❌ Error inserting chunk:', err.message);
+        }
+    });
+
+    buffer.on('summarize', async (summaryData) => {
+        try {
+            const result = await summarizeSpeaker(summaryData);
+            console.log(
+                `📝 Speaker summary updated: ${
+                    summaryData.speakerName
+                }\n   Topics: ${result.topics.join(', ')}\n   Summary: ${
+                    result.summary
+                }`
+            );
+        } catch (err) {
+            console.error('❌ Error summarizing speaker:', err.message);
+        }
+    });
 }
 
 /**
@@ -108,7 +122,15 @@ router.post('/', async (req, res) => {
     await ensureRTMSInitialized();
 
     // Forward event to RTMSManager — it handles the RTMS connection lifecycle
-    if (event === 'meeting.rtms_started' || event === 'meeting.rtms_stopped') {
+    if (event === 'meeting.rtms_started') {
+        dbg(`Forwarding ${event} to RTMSManager`);
+        RTMSManager.handleEvent(event, payload);
+    } else if (event === 'meeting.rtms_stopped') {
+        const meetingId = payload?.object?.id || payload?.object?.meeting_id;
+        if (meetingId) {
+            destroyBuffer(String(meetingId));
+            wiredMeetings.delete(String(meetingId));
+        }
         dbg(`Forwarding ${event} to RTMSManager`);
         RTMSManager.handleEvent(event, payload);
     }
