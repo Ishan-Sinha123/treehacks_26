@@ -85,20 +85,43 @@ function initializeContextToggle() {
  * Poll speakers from backend and update UI
  */
 async function pollSpeakers() {
-    if (!meetingId) return;
+    if (!meetingId) {
+        console.warn('[poll] No meetingId — skipping');
+        return;
+    }
 
     try {
         const response = await fetch(`/api/meeting/${meetingId}/speakers`);
         const data = await response.json();
         const speakers = data.speakers || [];
 
+        console.log(
+            `[poll] meetingId=${meetingId}, speakers returned:`,
+            speakers.length
+        );
+
         if (speakers.length === 0) return;
+
+        // Log what we're trying to match
+        const slotNames = participantNames.map((el) => el?.textContent?.trim());
+        const speakerNames = speakers.map((s) => s.speaker_name);
+        console.log('[poll] Slot names:', slotNames);
+        console.log('[poll] Speaker names from ES:', speakerNames);
 
         // Update immersive view participant summaries
         // Match speakers to participant slots by name
         for (let i = 0; i < participantNames.length; i++) {
             const slotName = participantNames[i]?.textContent?.trim();
-            if (!slotName || slotName === `Participant ${i + 1}`) continue;
+            if (!slotName || slotName === `Participant ${i + 1}`) {
+                // Fallback: if names weren't set by drawParticipants, assign speakers by index
+                if (speakers[i] && participantSummaries[i]) {
+                    participantNames[i].textContent =
+                        speakers[i].speaker_name || `Speaker ${i + 1}`;
+                    participantSummaries[i].textContent =
+                        speakers[i].context_summary || 'No summary yet.';
+                }
+                continue;
+            }
 
             const matched = speakers.find(
                 (s) =>
