@@ -7,25 +7,25 @@ export async function setupInferenceEndpoints() {
     // 1. Setup Jina Embeddings
     if (jinaApiKey) {
         try {
-            await esClient.inference.put({
-                inference_id: 'jina-embeddings',
+            await esClient.transport.request({
+                method: 'PUT',
+                path: '/_inference/text_embedding/jina-embeddings',
                 body: {
                     service: 'jina',
                     service_settings: {
                         api_key: jinaApiKey,
                         model_id: 'jina-embeddings-v3',
-                        task_type: 'text_embedding',
                     },
                 },
             });
             console.log('✅ Jina embeddings endpoint configured');
         } catch (error) {
-            if (error.statusCode === 409) {
+            if (error.statusCode === 409 || error.meta?.statusCode === 409) {
                 console.log('ℹ️  Jina embeddings endpoint already exists');
             } else {
                 console.error(
                     '❌ Failed to configure Jina embeddings:',
-                    error.message
+                    error.meta?.body || error.message
                 );
             }
         }
@@ -36,58 +36,58 @@ export async function setupInferenceEndpoints() {
     // 2. Setup OpenAI Chat (if available)
     if (openaiApiKey) {
         try {
-            await esClient.inference.put({
-                inference_id: 'openai-chat',
+            await esClient.transport.request({
+                method: 'PUT',
+                path: '/_inference/completion/openai-chat',
                 body: {
                     service: 'openai',
                     service_settings: {
                         api_key: openaiApiKey,
                         model_id: 'gpt-4o-mini',
                     },
-                    task_settings: {
-                        task_type: 'completion',
-                    },
                 },
             });
             console.log('✅ OpenAI chat endpoint configured');
         } catch (error) {
-            if (error.statusCode === 409) {
+            if (error.statusCode === 409 || error.meta?.statusCode === 409) {
                 console.log('ℹ️  OpenAI chat endpoint already exists');
             } else {
                 console.error(
                     '❌ Failed to configure OpenAI chat:',
-                    error.message
+                    error.meta?.body || error.message
                 );
             }
         }
-    } else if (anthropicApiKey) {
-        // 3. Setup Anthropic Chat (alternative)
+    }
+
+    // 3. Setup Anthropic Chat (if available)
+    if (anthropicApiKey) {
         try {
-            await esClient.inference.put({
-                inference_id: 'claude-chat',
+            await esClient.transport.request({
+                method: 'PUT',
+                path: '/_inference/completion/claude-chat',
                 body: {
                     service: 'anthropic',
                     service_settings: {
                         api_key: anthropicApiKey,
                         model_id: 'claude-sonnet-4-20250514',
                     },
-                    task_settings: {
-                        task_type: 'completion',
-                    },
                 },
             });
             console.log('✅ Claude chat endpoint configured');
         } catch (error) {
-            if (error.statusCode === 409) {
+            if (error.statusCode === 409 || error.meta?.statusCode === 409) {
                 console.log('ℹ️  Claude chat endpoint already exists');
             } else {
                 console.error(
                     '❌ Failed to configure Claude chat:',
-                    error.message
+                    error.meta?.body || error.message
                 );
             }
         }
-    } else {
+    }
+
+    if (!openaiApiKey && !anthropicApiKey) {
         console.warn('⚠️  No LLM API key set, skipping chat setup');
     }
 
