@@ -4,6 +4,7 @@ import { elasticsearchUrl } from '../../config.js';
 const esClient = new Client({
     node: elasticsearchUrl,
     requestTimeout: 30000,
+    maxRetries: 5,
 });
 
 // Readiness gate — resolves once indices are initialized
@@ -12,16 +13,28 @@ const indicesReadyPromise = new Promise((resolve) => {
     indicesReady = resolve;
 });
 
-// Test connection
-export async function testConnection() {
-    try {
-        const health = await esClient.cluster.health();
-        console.log('✅ Elasticsearch connected:', health.status);
-        return true;
-    } catch (error) {
-        console.error('❌ Elasticsearch connection failed:', error.message);
-        return false;
+// Test connection with retries
+export async function testConnection(retries = 5) {
+    for (let i = 0; i < retries; i++) {
+        try {
+            const health = await esClient.cluster.health();
+            console.log('✅ Elasticsearch connected:', health.status);
+            return true;
+        } catch (error) {
+            console.error(
+                `❌ Elasticsearch connection attempt ${
+                    i + 1
+                }/${retries} failed:`,
+                error.message
+            );
+            if (i < retries - 1) {
+                console.log(`⏳ Retrying in 3 seconds...`);
+                await new Promise((resolve) => setTimeout(resolve, 3000));
+            }
+        }
     }
+    console.error('❌ Elasticsearch connection failed after all retries');
+    return false;
 }
 
 // Initialize indices (run on startup)
@@ -133,9 +146,10 @@ export async function bulkInsertSegments(segments) {
 
     try {
         const result = await esClient.bulk({ body, refresh: true });
+        console.log(`✅ Bulk insert successful: ${segments.length} segments`);
         return result;
     } catch (error) {
-        console.error('Error bulk inserting segments:', error);
+        console.error('❌ Error bulk inserting segments:', error);
         throw error;
     }
 }
