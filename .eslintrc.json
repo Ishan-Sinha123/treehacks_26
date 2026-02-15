@@ -12,5 +12,5 @@
     "ecmaVersion": "latest",
     "sourceType": "module"
   },
-  "ignorePatterns": ["**/vendor/*.js"]
+  "ignorePatterns": ["**/vendor/*.js", "server/rtmsManager/**"]
 }

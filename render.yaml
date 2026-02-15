@@ -1,0 +1,17 @@
+- type: pserv
+    name: zoom-elasticsearch
+    env: docker
+    dockerfilePath: ./elasticsearch/Dockerfile
+    disk:
+      name: elasticsearch-data
+      mountPath: /usr/share/elasticsearch/data
+      sizeGB: 10
+    envVars:
+      - key: discovery.type
+        value: single-node
+      - key: xpack.security.enabled
+        value: "false"
+      - key: ES_JAVA_OPTS
+        value: "-Xms512m -Xmx512m"
+      - key: bootstrap.memory_lock
+        value: "false"
