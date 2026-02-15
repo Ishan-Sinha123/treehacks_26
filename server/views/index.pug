@@ -1,13 +1,16 @@
 extends layout
+include mixins/prompt-install
 
 block content
-    h1=title
     if isZoom
-        p Welcome to your Zoom App
+        #main
+            h1= title
+            button.hidden#toggle-view Toggle View
+
+        .hidden#immersive
+            canvas#immersive-canvas
     else
-        p You're viewing your Zoom App through the browser.&nbsp;
-            a(href=`/install`) Click Here
-            | &nbsp;to install your app in Zoom.
+        +prompt-install(title, installURL)
 
 append scripts
     if isZoom
