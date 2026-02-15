@@ -137,8 +137,15 @@ export async function insertTranscriptSegment(segment) {
 }
 
 // Bulk insert transcript segments
+// Bulk insert transcript segments
 export async function bulkInsertSegments(segments) {
     await indicesReadyPromise;
+
+    console.log(
+        `🔍 Attempting to insert ${segments.length} segments:`,
+        JSON.stringify(segments[0], null, 2)
+    );
+
     const body = segments.flatMap((doc) => [
         { index: { _index: 'transcript_segments' } },
         doc,
@@ -146,7 +153,17 @@ export async function bulkInsertSegments(segments) {
 
     try {
         const result = await esClient.bulk({ body, refresh: true });
-        console.log(`✅ Bulk insert successful: ${segments.length} segments`);
+
+        console.log(`📊 Bulk response:`, JSON.stringify(result, null, 2));
+
+        if (result.errors) {
+            console.error('❌ Bulk insert had errors:', result.items);
+        } else {
+            console.log(
+                `✅ Bulk insert successful: ${segments.length} segments`
+            );
+        }
+
         return result;
     } catch (error) {
         console.error('❌ Error bulk inserting segments:', error);
