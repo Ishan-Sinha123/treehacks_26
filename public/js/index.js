@@ -177,10 +177,10 @@ async function drawParticipants() {
 
     // Define 4 positions in a row
     const positions = [
-        { x: 0, y: 0 }, // Left
-        { x: quarterWidth, y: 0 }, // Center-left
-        { x: quarterWidth * 2, y: 0 }, // Center-right
-        { x: quarterWidth * 3, y: 0 }, // Right
+        { x: 0, y: -height / 4 }, // Left
+        { x: quarterWidth, y: -height / 4 }, // Center-left
+        { x: quarterWidth * 2, y: -height / 4 }, // Center-right
+        { x: quarterWidth * 3, y: -height / 4 }, // Right
     ];
 
     // Draw up to 4 participants

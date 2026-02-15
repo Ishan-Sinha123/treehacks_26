@@ -2,7 +2,7 @@
     position: fixed;
     bottom: 0;
     width: 100%;
-    height: 60%;
+    height: 75%;
 }
 
 #timeline {
@@ -15,7 +15,7 @@
 }
 
 #chat-messages {
-    height: 400px;
+    height: 300px;
     overflow-y: auto;
     border: 1px solid #dbdbdb;
     border-radius: 6px;
