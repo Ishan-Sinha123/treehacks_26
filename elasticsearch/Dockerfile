@@ -4,6 +4,9 @@ FROM docker.elastic.co/elasticsearch/elasticsearch:8.11.0
 ENV xpack.security.enabled=false
 ENV discovery.type=single-node
 
+# Reduce memory usage for free tier
+ENV ES_JAVA_OPTS="-Xms256m -Xmx256m"
+
 # Expose ports
 EXPOSE 9200 9300
 
