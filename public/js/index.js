@@ -4,6 +4,8 @@ import zoomSdk from '@zoom/appssdk';
 let participants = [];
 let inImmersiveView = false;
 let isChatProcessing = false;
+let meetingId = null;
+let pollInterval = null;
 
 // Get components
 const mainContent = document.getElementById('main');
@@ -22,6 +24,14 @@ const participantNames = [
     participant2Name,
     participant3Name,
     participant4Name,
+];
+
+// Context summary elements (immersive view)
+const participantSummaries = [
+    document.getElementById('participant-1-summary'),
+    document.getElementById('participant-2-summary'),
+    document.getElementById('participant-3-summary'),
+    document.getElementById('participant-4-summary'),
 ];
 
 // Context buttons and containers
@@ -71,6 +81,117 @@ function initializeContextToggle() {
     }
 }
 
+/**
+ * Poll speakers from backend and update UI
+ */
+async function pollSpeakers() {
+    if (!meetingId) {
+        console.warn('[poll] No meetingId — skipping');
+        return;
+    }
+
+    try {
+        const response = await fetch(`/api/meeting/${meetingId}/speakers`);
+        const data = await response.json();
+        const speakers = data.speakers || [];
+
+        console.log(
+            `[poll] meetingId=${meetingId}, speakers returned:`,
+            speakers.length
+        );
+
+        if (speakers.length === 0) return;
+
+        // Log what we're trying to match
+        const slotNames = participantNames.map((el) => el?.textContent?.trim());
+        const speakerNames = speakers.map((s) => s.speaker_name);
+        console.log('[poll] Slot names:', slotNames);
+        console.log('[poll] Speaker names from ES:', speakerNames);
+
+        // Update immersive view participant summaries
+        // Match speakers to participant slots by name
+        for (let i = 0; i < participantNames.length; i++) {
+            const slotName = participantNames[i]?.textContent?.trim();
+            if (!slotName || slotName === `Participant ${i + 1}`) {
+                // Fallback: if names weren't set by drawParticipants, assign speakers by index
+                if (speakers[i] && participantSummaries[i]) {
+                    participantNames[i].textContent =
+                        speakers[i].speaker_name || `Speaker ${i + 1}`;
+                    participantSummaries[i].textContent =
+                        speakers[i].context_summary || 'No summary yet.';
+                }
+                continue;
+            }
+
+            const matched = speakers.find(
+                (s) =>
+                    s.speaker_name &&
+                    slotName
+                        .toLowerCase()
+                        .includes(s.speaker_name.toLowerCase())
+            );
+
+            if (matched && participantSummaries[i]) {
+                participantSummaries[i].textContent =
+                    matched.context_summary || 'No summary yet.';
+            }
+        }
+
+        // Update timeline with topics from all speakers
+        updateTimeline(speakers);
+    } catch (error) {
+        console.error('Failed to poll speakers:', error);
+    }
+}
+
+/**
+ * Update the timeline with real topics from speakers
+ */
+function updateTimeline(speakers) {
+    const timeline = document.getElementById('timeline');
+    if (!timeline) return;
+
+    // Collect all topics from all speakers
+    const allTopics = [];
+    for (const speaker of speakers) {
+        if (speaker.topics && Array.isArray(speaker.topics)) {
+            for (const topic of speaker.topics) {
+                if (!allTopics.includes(topic)) {
+                    allTopics.push(topic);
+                }
+            }
+        }
+    }
+
+    if (allTopics.length === 0) return;
+
+    // Clear existing timeline items (keep the spacer div at the end)
+    while (timeline.children.length > 1) {
+        timeline.removeChild(timeline.firstChild);
+    }
+
+    // Add topic boxes
+    const spacer = timeline.lastElementChild;
+    for (const topic of allTopics) {
+        const box = document.createElement('div');
+        box.className = 'box content ml-3';
+        const p = document.createElement('p');
+        p.textContent = topic;
+        box.appendChild(p);
+        timeline.insertBefore(box, spacer);
+    }
+}
+
+/**
+ * Start polling for speaker data
+ */
+function startPolling() {
+    if (pollInterval) clearInterval(pollInterval);
+    // Poll immediately, then every 5 seconds
+    pollSpeakers();
+    pollInterval = setInterval(pollSpeakers, 5000);
+}
+
 // Initialize app
 (async () => {
     try {
@@ -84,20 +205,35 @@ function initializeContextToggle() {
                 'clearParticipant',
                 'getMeetingParticipants',
                 'getUserContext',
+                'getMeetingContext',
                 'onParticipantChange',
             ],
         });
 
         console.debug('Zoom JS SDK Configuration', configResponse);
 
+        // Capture meetingId
+        try {
+            const meetingContext = await zoomSdk.getMeetingContext();
+            meetingId = meetingContext.meetingID || null;
+            console.log('Meeting ID:', meetingId);
+        } catch (err) {
+            console.warn('Could not get meeting context:', err.message);
+        }
+
         const { runningContext } = configResponse;
 
         if (runningContext === 'inMeeting') {
-            // SIDEBAR MODE
-            await zoomSdk.callZoomApi('startRTMS');
-
             const userContext = await zoomSdk.getUserContext();
             if (userContext.role === 'host') {
+                // Start RTMS — triggers Zoom to send meeting.rtms_started webhook
+                try {
+                    await zoomSdk.callZoomApi('startRTMS');
+                    console.log('RTMS started successfully');
+                } catch (rtmsErr) {
+                    console.warn('Failed to start RTMS:', rtmsErr.message);
+                }
+
                 toggleButton.classList.remove('is-hidden');
                 toggleButton.addEventListener('click', toggleImmersiveView);
                 initializeChat();
@@ -115,6 +251,9 @@ function initializeContextToggle() {
             participants = response.participants || [];
             console.log('Participants in immersive mode:', participants);
             await drawParticipants();
+
+            // Start polling for speaker data
+            startPolling();
 
             // Listen for participant changes
             zoomSdk.onParticipantChange(handleParticipantChange);
@@ -280,13 +419,13 @@ async function handleChatSubmit() {
         // Clear input field
         chatInput.value = '';
 
-        // Send to backend
+        // Send to backend with meetingId
         const response = await fetch('/chat', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ message }),
+            body: JSON.stringify({ message, meetingId }),
         });
 
         const data = await response.json();

@@ -5,6 +5,7 @@ import {
     semanticSearch,
     esClient,
 } from '../helpers/elasticsearch.js';
+import { getMeetingUuid } from './webhook.js';
 
 const router = express.Router();
 
@@ -22,7 +23,11 @@ router.get('/speaker/:speakerId/context', async (req, res, next) => {
             return res.status(400).json({ error: 'meetingId required' });
         }
 
-        const context = await getSpeakerContext(speakerId, meetingId);
+        // Translate numeric meeting ID → UUID
+        const uuid = getMeetingUuid(meetingId);
+        const queryId = uuid || meetingId;
+
+        const context = await getSpeakerContext(speakerId, queryId);
 
         if (!context) {
             return res.json({
@@ -56,8 +61,12 @@ router.post('/chat/:speakerId', async (req, res, next) => {
                 .json({ error: 'question and meetingId required' });
         }
 
+        // Translate numeric meeting ID → UUID
+        const uuid = getMeetingUuid(meetingId);
+        const queryId = uuid || meetingId;
+
         // 1. Get speaker summary from speaker_context
-        const context = await getSpeakerContext(speakerId, meetingId);
+        const context = await getSpeakerContext(speakerId, queryId);
         const summary = context?.context_summary || '';
 
         // 2. Semantic search scoped to this speaker for relevant chunks
@@ -65,7 +74,7 @@ router.post('/chat/:speakerId', async (req, res, next) => {
         try {
             relevantChunks = await semanticSearch(
                 question,
-                meetingId,
+                queryId,
                 speakerId,
                 5
             );
@@ -131,10 +140,14 @@ router.post('/semantic-search', async (req, res, next) => {
             return res.status(400).json({ error: 'query required' });
         }
 
+        // Translate numeric meeting ID → UUID if provided
+        const uuid = meetingId ? getMeetingUuid(meetingId) : null;
+        const queryId = uuid || meetingId;
+
         try {
             const results = await semanticSearch(
                 query,
-                meetingId,
+                queryId,
                 speakerId,
                 size
             );
@@ -165,6 +178,41 @@ router.post('/semantic-search', async (req, res, next) => {
 });
 
 /**
+ * Get all speakers for a meeting
+ * GET /api/meeting/:meetingId/speakers
+ */
+router.get('/meeting/:meetingId/speakers', async (req, res, next) => {
+    try {
+        sanitize(req);
+        const { meetingId } = req.params;
+
+        // Frontend sends numeric meeting ID, ES stores UUID — translate
+        const uuid = getMeetingUuid(meetingId);
+        const queryId = uuid || meetingId;
+        console.log(
+            `🔎 GET /api/meeting/${meetingId}/speakers → querying ES with meeting_id="${queryId}" (translated: ${!!uuid})`
+        );
+
+        const result = await esClient.search({
+            index: 'speaker_context',
+            body: {
+                query: { term: { meeting_id: queryId } },
+                sort: [{ last_updated: 'desc' }],
+                size: 50,
+            },
+        });
+
+        const speakers = result.hits.hits.map((hit) => hit._source);
+        console.log(
+            `🔎 GET /api/meeting/${meetingId}/speakers → found ${speakers.length} speakers`
+        );
+        res.json({ meeting_id: meetingId, uuid: queryId, speakers });
+    } catch (e) {
+        next(handleError(e));
+    }
+});
+
+/**
  * Get all chunks for a meeting (debugging/demo)
  * GET /api/chunks/:meetingId
  */
@@ -173,10 +221,14 @@ router.get('/chunks/:meetingId', async (req, res, next) => {
         sanitize(req);
         const { meetingId } = req.params;
 
+        // Translate numeric meeting ID → UUID
+        const uuid = getMeetingUuid(meetingId);
+        const queryId = uuid || meetingId;
+
         const result = await esClient.search({
             index: 'transcript_chunks',
             body: {
-                query: { match: { meeting_id: meetingId } },
+                query: { match: { meeting_id: queryId } },
                 sort: [{ start_time: 'asc' }],
                 size: 1000,
             },
