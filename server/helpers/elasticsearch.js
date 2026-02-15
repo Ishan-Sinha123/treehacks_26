@@ -116,7 +116,7 @@ export async function initializeIndices() {
                         await esClient.indices.delete({ index: index.name });
                         await esClient.indices.create({
                             index: index.name,
-                            body: { mappings: index.mappings },
+                            mappings: index.mappings,
                         });
                         console.log(
                             `✅ Recreated index: ${index.name} with semantic_text`
@@ -128,7 +128,7 @@ export async function initializeIndices() {
             } else {
                 await esClient.indices.create({
                     index: index.name,
-                    body: { mappings: index.mappings },
+                    mappings: index.mappings,
                 });
                 console.log(`✅ Created index: ${index.name}`);
             }
@@ -149,7 +149,7 @@ export async function insertTranscriptChunk(chunk) {
     try {
         const result = await esClient.index({
             index: 'transcript_chunks',
-            body: chunk,
+            document: chunk,
         });
         console.log(`✅ Inserted transcript chunk: ${chunk.chunk_id}`);
         return result;
@@ -165,7 +165,7 @@ export async function insertSpeakerTranscript(utterance) {
     try {
         await esClient.index({
             index: 'speaker_transcripts',
-            body: {
+            document: {
                 speaker_id: utterance.speaker_id,
                 speaker_name: utterance.speaker_name,
                 meeting_id: utterance.meeting_id,
@@ -188,10 +188,10 @@ export async function semanticSearch(query, meetingId, speakerId, size = 10) {
     // Try semantic search first (requires jina_embeddings + semantic_text field)
     try {
         const must = [{ semantic: { field: 'text', query } }];
-        const body = { query: { bool: { must, filter } }, size };
         const result = await esClient.search({
             index: 'transcript_chunks',
-            body,
+            query: { bool: { must, filter } },
+            size,
         });
         return result.hits.hits.map((h) => ({ ...h._source, score: h._score }));
     } catch {
@@ -200,10 +200,10 @@ export async function semanticSearch(query, meetingId, speakerId, size = 10) {
 
     try {
         const must = [{ match: { text: query } }];
-        const body = { query: { bool: { must, filter } }, size };
         const result = await esClient.search({
             index: 'transcript_chunks',
-            body,
+            query: { bool: { must, filter } },
+            size,
         });
         return result.hits.hits.map((h) => ({ ...h._source, score: h._score }));
     } catch (error) {
@@ -227,7 +227,7 @@ export async function upsertSpeakerContext(
         const result = await esClient.index({
             index: 'speaker_context',
             id: docId,
-            body: {
+            document: {
                 speaker_id: speakerId,
                 speaker_name: speakerName,
                 meeting_id: meetingId,
@@ -270,7 +270,7 @@ export async function upsertMeeting(meetingData) {
         const result = await esClient.index({
             index: 'meetings',
             id: meetingData.meeting_id,
-            body: meetingData,
+            document: meetingData,
         });
         return result;
     } catch (error) {

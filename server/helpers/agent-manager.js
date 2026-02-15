@@ -293,10 +293,8 @@ export async function handleUserChat(speakerName, message) {
     try {
         const result = await esClient.search({
             index: 'speaker_context',
-            body: {
-                query: { match: { speaker_name: speakerName } },
-                size: 1,
-            },
+            query: { match: { speaker_name: speakerName } },
+            size: 1,
         });
         speakerId = result.hits.hits[0]?._source?.speaker_id;
     } catch {
@@ -304,10 +302,8 @@ export async function handleUserChat(speakerName, message) {
         try {
             const result = await esClient.search({
                 index: 'speaker_transcripts',
-                body: {
-                    query: { match: { speaker_name: speakerName } },
-                    size: 1,
-                },
+                query: { match: { speaker_name: speakerName } },
+                size: 1,
             });
             speakerId = result.hits.hits[0]?._source?.speaker_id;
         } catch {

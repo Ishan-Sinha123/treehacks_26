@@ -40,10 +40,8 @@ export async function getMeetingUuid(numericId) {
     try {
         const result = await esClient.search({
             index: 'meetings',
-            body: {
-                query: { term: { meeting_id: key } },
-                size: 1,
-            },
+            query: { term: { meeting_id: key } },
+            size: 1,
         });
 
         const hit = result.hits.hits[0];
@@ -71,7 +69,7 @@ export async function cacheMeetingMapping(numericId, uuid) {
         await esClient.index({
             index: 'meetings',
             id: key,
-            body: {
+            document: {
                 meeting_id: key,
                 meeting_uuid: uuid,
                 start_time: new Date().toISOString(),
@@ -240,7 +238,7 @@ router.post('/', async (req, res) => {
                 await esClient.index({
                     index: 'meetings',
                     id: String(numericId),
-                    body: {
+                    document: {
                         meeting_id: String(numericId),
                         meeting_uuid: uuid,
                         start_time: new Date().toISOString(),

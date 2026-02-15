@@ -190,11 +190,9 @@ router.get('/meeting/:meetingId/speakers', async (req, res, next) => {
         try {
             const result = await esClient.search({
                 index: 'speaker_context',
-                body: {
-                    query: { match_all: {} },
-                    sort: [{ last_updated: 'desc' }],
-                    size: 50,
-                },
+                query: { match_all: {} },
+                sort: [{ last_updated: 'desc' }],
+                size: 50,
             });
             speakers = result.hits.hits.map((hit) => hit._source);
         } catch (searchErr) {
@@ -222,11 +220,9 @@ router.get('/chunks/:meetingId', async (req, res, next) => {
 
         const result = await esClient.search({
             index: 'transcript_chunks',
-            body: {
-                query: { match: { meeting_id: queryId } },
-                sort: [{ start_time: 'asc' }],
-                size: 1000,
-            },
+            query: { match: { meeting_id: queryId } },
+            sort: [{ start_time: 'asc' }],
+            size: 1000,
         });
 
         const chunks = result.hits.hits.map((hit) => hit._source);
