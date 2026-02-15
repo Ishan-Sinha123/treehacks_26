@@ -44,6 +44,8 @@ export const elasticsearchUrl =
 // NEW: API Keys (optional - features will be disabled if not set)
 export const anthropicApiKey = config.ANTHROPIC_API_KEY;
 export const jinaApiKey = config.JINA_API_KEY;
+// Zoom RTMS
+export const zmSecretToken = config.ZM_SECRET_TOKEN;
 // require secrets are explicitly imported
 export default {
     appName,
@@ -52,4 +54,5 @@ export default {
     elasticsearchUrl,
     anthropicApiKey,
     jinaApiKey,
+    zmSecretToken,
 };

@@ -11,6 +11,7 @@ import { start } from './server/server.js';
 import indexRoutes from './server/routes/index.js';
 import authRoutes from './server/routes/auth.js';
 import apiRoutes from './server/routes/api.js';
+import webhookRoutes from './server/routes/webhook.js';
 import { initializeRTMSWebSocket } from './server/routes/rtms.js';
 import { appName, port, redirectUri } from './config.js';
 
@@ -84,6 +85,7 @@ app.use(express.static(staticDir));
 app.use('/', indexRoutes);
 app.use('/auth', authRoutes);
 app.use('/api', apiRoutes); // NEW: API routes
+app.use('/webhook', webhookRoutes); // Zoom RTMS webhooks
 
 // eslint-disable-next-line no-unused-vars
 app.use((err, req, res, next) => {
