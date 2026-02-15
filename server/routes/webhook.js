@@ -44,10 +44,10 @@ async function ensureRTMSInitialized() {
 
     // Listen for transcript events from RTMSManager
     RTMSManager.on('transcript', (eventData) => {
-        dbg(
-            `Transcript from ${eventData.userName || 'Unknown'}: ${(
-                eventData.text || ''
-            ).substring(0, 50)}...`
+        console.log(
+            `📝 TRANSCRIPT [${eventData.userName || 'Unknown'}]: ${
+                eventData.text || '(empty)'
+            }`
         );
 
         const segment = {

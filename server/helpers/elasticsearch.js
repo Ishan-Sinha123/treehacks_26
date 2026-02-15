@@ -6,6 +6,12 @@ const esClient = new Client({
     requestTimeout: 30000,
 });
 
+// Readiness gate — resolves once indices are initialized
+let indicesReady;
+const indicesReadyPromise = new Promise((resolve) => {
+    indicesReady = resolve;
+});
+
 // Test connection
 export async function testConnection() {
     try {
@@ -98,10 +104,13 @@ export async function initializeIndices() {
             );
         }
     }
+
+    indicesReady();
 }
 
 // Insert transcript segment
 export async function insertTranscriptSegment(segment) {
+    await indicesReadyPromise;
     try {
         const result = await esClient.index({
             index: 'transcript_segments',
@@ -116,6 +125,7 @@ export async function insertTranscriptSegment(segment) {
 
 // Bulk insert transcript segments
 export async function bulkInsertSegments(segments) {
+    await indicesReadyPromise;
     const body = segments.flatMap((doc) => [
         { index: { _index: 'transcript_segments' } },
         doc,
