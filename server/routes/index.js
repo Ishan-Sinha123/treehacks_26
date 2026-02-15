@@ -31,12 +31,43 @@ router.get('/', async (req, res, next) => {
 
         // Check if the context is valid and not expired
         if (isContextExpired(context)) {
-            return res.status(401).json({ error: 'Invalid or expired context' });
+            return res
+                .status(401)
+                .json({ error: 'Invalid or expired context' });
         }
 
         return res.render('index', {
             isZoom: true,
-            title: `Hello Zoom`,
+            title: 'Context Assistant',
+            participantContexts: {
+                user1: 'Wants to build an app with LLMs. Unsure how to get started.',
+                user2: 'Knows a bit about LLMs, but is concerned about data privacy and security.',
+                user3: "Isn't sure if they want to use LLMs in their app, but is interested in learning more about the possibilities.",
+                user4: 'Has experience with traditional software but wants to explore how AI can enhance their products.',
+            },
+            conversationTimeline: [
+                'Topic A',
+                'Another topic',
+                'Something else',
+                'Topic A',
+                'Yet another thing',
+                'More concepts about things',
+                'Something else',
+                'Topic A',
+                'Topic A',
+                'Another topic',
+                'Something else',
+                'Topic A',
+                'Yet another thing',
+                'More concepts about things',
+                'Something else',
+                'Another topic',
+                'Something else',
+                'Topic A',
+                'Yet another thing',
+                'More concepts about things',
+                'Something else',
+            ],
         });
     } catch (e) {
         next(handleError(e));

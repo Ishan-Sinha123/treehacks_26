@@ -1,12 +1,13 @@
 {
   "permissions": {
     "allow": [
-      "WebSearch",
-      "WebFetch(domain:appssdk.zoom.us)",
-      "WebFetch(domain:raw.githubusercontent.com)",
-      "WebFetch(domain:github.com)",
-      "WebFetch(domain:developers.zoom.us)",
-      "WebFetch(domain:devforum.zoom.us)"
+        "WebSearch",
+        "WebFetch(domain:appssdk.zoom.us)",
+        "WebFetch(domain:raw.githubusercontent.com)",
+        "WebFetch(domain:github.com)",
+        "WebFetch(domain:developers.zoom.us)",
+        "WebFetch(domain:devforum.zoom.us)",
+        "WebFetch(domain:bulma.io)"
     ]
   }
 }

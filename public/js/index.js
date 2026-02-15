@@ -9,6 +9,17 @@ const mainContent = document.getElementById('main');
 const toggleButton = document.getElementById('toggle-view');
 const immersiveContainer = document.getElementById('immersive');
 
+const participant1Name = document.getElementById('participant-1-name');
+const participant2Name = document.getElementById('participant-2-name');
+const participant3Name = document.getElementById('participant-3-name');
+const participant4Name = document.getElementById('participant-4-name');
+const participantNames = [
+    participant1Name,
+    participant2Name,
+    participant3Name,
+    participant4Name,
+];
+
 // Initialize app
 (async () => {
     try {
@@ -87,7 +98,7 @@ async function toggleImmersiveView() {
 }
 
 /**
- * Draw participants in 2x2 grid (up to 4 participants).
+ * Draw participants in a row (up to 4 participants).
  */
 async function drawParticipants() {
     // Clear existing participants first
@@ -104,24 +115,23 @@ async function drawParticipants() {
         }
     }
 
-    // Calculate positions for 2x2 grid
+    // Calculate positions for a horizontal row
     const width = window.innerWidth;
     const height = window.innerHeight;
-    const halfWidth = width / 2;
-    const halfHeight = height / 2;
+    const quarterWidth = width / 2;
 
-    // Define 4 quadrant positions
+    // Define 4 positions in a row
     const positions = [
-        { x: 0, y: 0 }, // Top-left
-        { x: halfWidth, y: 0 }, // Top-right
-        { x: 0, y: halfHeight }, // Bottom-left
-        { x: halfWidth, y: halfHeight }, // Bottom-right
+        { x: 0, y: 0 }, // Left
+        { x: quarterWidth, y: 0 }, // Center-left
+        { x: quarterWidth * 2, y: 0 }, // Center-right
+        { x: quarterWidth * 3, y: 0 }, // Right
     ];
 
     // Draw up to 4 participants
     const displayParticipants = participants.slice(0, 4);
-    for (let i = 0; i < displayParticipants.length; i++) {
-        const participant = displayParticipants[i];
+    for (let i = 0; i < 4; i++) {
+        const participant = displayParticipants[0];
         const pos = positions[i];
 
         try {
@@ -129,10 +139,12 @@ async function drawParticipants() {
                 participantUUID: participant.participantUUID,
                 x: Math.round(pos.x),
                 y: Math.round(pos.y),
-                width: Math.round(halfWidth),
-                height: Math.round(halfHeight),
+                width: Math.round(quarterWidth),
+                height: Math.round(height),
                 zIndex: 1,
             });
+            participantNames[i].textContent =
+                participant.screenName || 'Unknown';
             console.log(
                 `Drew participant: ${
                     participant.screenName || participant.participantUUID

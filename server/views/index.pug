@@ -3,12 +3,44 @@ include mixins/prompt-install
 
 block content
     if isZoom
-        #main
+        // Sidebar.
+        .content.m-4#main
             h1= title
-            button.hidden#toggle-view Toggle View
+            button.button.is-primary.hidden#toggle-view Toggle View
 
-        .hidden#immersive
-            canvas#immersive-canvas
+        // Immersive view.
+        .content.hidden.m-4.mr-6#immersive
+            .fixed-grid.has-4-cols
+                .grid
+                    // Names
+                    .cell
+                        strong#participant-1-name Participant 1
+                    .cell
+                        strong#participant-2-name Participant 2
+                    .cell
+                        strong#participant-3-name Participant 3
+                    .cell
+                        strong#participant-4-name Participant 4
+
+                    // Local contexts
+                    .cell
+                        h4= participantContexts['user1']
+                    .cell
+                        h4= participantContexts['user2']
+                    .cell
+                        h4= participantContexts['user3']
+                    .cell
+                        h4= participantContexts['user4']
+            br
+            br
+            // Conversation timeline.
+            .is-flex.is-justify-content-end.is-flex-wrap-nowrap.is-overflow-x-auto#timeline
+                each item in conversationTimeline
+                    .box.content.ml-3
+                        p= item
+                // Extra spacer for the end.
+                div
+
     else
         +prompt-install(title, installURL)
 
