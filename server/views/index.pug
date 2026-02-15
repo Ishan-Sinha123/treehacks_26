@@ -34,9 +34,13 @@ block content
 
             // Conversation timeline.
             .is-flex.is-justify-content-end.is-flex-wrap-nowrap.is-overflow-x-auto#timeline
-                each conversation in conversationTimeline
+                each item in conversationTimeline
                     .box.content.is-display-inline-block.ml-3
-                        p= conversation
+                        .columns
+                            .column
+                                div.timeline-dot(style=`background-color: ${item.color};`)
+                            .column
+                                p= item.text
                 // Extra spacer for the end.
                 div
 

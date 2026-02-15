@@ -13,3 +13,13 @@
 #timeline {
     white-space: nowrap;
 }
+
+/* Timeline item with colored dot */
+.timeline-dot {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    margin-top: 6px;
+    flex-shrink: 0;
+}

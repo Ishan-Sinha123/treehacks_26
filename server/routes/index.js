@@ -3,6 +3,7 @@ import { handleError, sanitize } from '../helpers/routing.js';
 import { contextHeader, getAppContext } from '../helpers/cipher.js';
 import { getInstallURL } from '../helpers/zoom-api.js';
 import session from '../session.js';
+import { stringToColor } from '../helpers/color.js';
 
 const router = express.Router();
 
@@ -36,6 +37,35 @@ router.get('/', async (req, res, next) => {
                 .json({ error: 'Invalid or expired context' });
         }
 
+        const rawTimeline = [
+            'Topic A',
+            'Another topic',
+            'Something else',
+            'Topic A',
+            'Yet another thing',
+            'More concepts about things',
+            'Something else',
+            'Topic A',
+            'Topic A',
+            'Another topic',
+            'Something else',
+            'Topic A',
+            'Yet another thing',
+            'More concepts about things',
+            'Something else',
+            'Another topic',
+            'Something else',
+            'Topic A',
+            'Yet another thing',
+            'More concepts about things',
+            'Something else',
+        ];
+
+        const conversationTimeline = rawTimeline.map((text) => ({
+            text,
+            color: stringToColor(text),
+        }));
+
         return res.render('index', {
             isZoom: true,
             title: 'Context Assistant',
@@ -45,29 +75,7 @@ router.get('/', async (req, res, next) => {
                 user3: "Isn't sure if they want to use LLMs in their app, but is interested in learning more about the possibilities.",
                 user4: 'Has experience with traditional software but wants to explore how AI can enhance their products.',
             },
-            conversationTimeline: [
-                'Topic A',
-                'Another topic',
-                'Something else',
-                'Topic A',
-                'Yet another thing',
-                'More concepts about things',
-                'Something else',
-                'Topic A',
-                'Topic A',
-                'Another topic',
-                'Something else',
-                'Topic A',
-                'Yet another thing',
-                'More concepts about things',
-                'Something else',
-                'Another topic',
-                'Something else',
-                'Topic A',
-                'Yet another thing',
-                'More concepts about things',
-                'Something else',
-            ],
+            conversationTimeline,
         });
     } catch (e) {
         next(handleError(e));
