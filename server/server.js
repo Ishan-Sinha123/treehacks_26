@@ -2,6 +2,7 @@ import http from 'http';
 import debug from 'debug';
 import { appName } from '../config.js';
 import { testConnection, initializeIndices } from './helpers/elasticsearch.js';
+import { setupInferenceEndpoints } from './helpers/setup-inference.js';
 
 const dbg = debug(`${appName}:http`);
 
@@ -19,6 +20,9 @@ export async function start(app, port) {
         console.log('🔄 Initializing Elasticsearch indices...');
         await initializeIndices();
         console.log('✅ Elasticsearch ready');
+
+        // NEW: Setup inference endpoints
+        await setupInferenceEndpoints();
     } else {
         console.warn(
             '⚠️  Elasticsearch not available - some features will be disabled'
