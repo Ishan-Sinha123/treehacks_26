@@ -92,30 +92,19 @@ async function pollSpeakers() {
 
     try {
         const url = `/api/meeting/${meetingId}/speakers`;
-        console.log(`[poll] Fetching: ${url}`);
         const response = await fetch(url);
-        console.log(`[poll] Response status: ${response.status}`);
-        const data = await response.json();
-        console.log('[poll] Full response:', JSON.stringify(data, null, 2));
-        const speakers = data.speakers || [];
 
-        console.log(
-            `[poll] meetingId=${meetingId}, uuid used=${data.uuid}, speakers returned:`,
-            speakers.length
-        );
-
-        if (speakers.length === 0) {
-            console.log(
-                '[poll] No speakers found — uuid mismatch or no data yet'
-            );
+        if (!response.ok) {
+            console.warn(`[poll] HTTP ${response.status} — skipping`);
             return;
         }
 
-        // Log what we're trying to match
-        const slotNames = participantNames.map((el) => el?.textContent?.trim());
-        const speakerNames = speakers.map((s) => s.speaker_name);
-        console.log('[poll] Slot names:', slotNames);
-        console.log('[poll] Speaker names from ES:', speakerNames);
+        const data = await response.json();
+        const speakers = data.speakers || [];
+
+        if (speakers.length === 0) return;
+
+        console.log(`[poll] ${speakers.length} speakers (uuid=${data.uuid})`);
 
         // Update immersive view participant summaries
         // Match speakers to participant slots by name

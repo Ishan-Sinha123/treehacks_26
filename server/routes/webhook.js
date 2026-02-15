@@ -59,6 +59,28 @@ export async function getMeetingUuid(numericId) {
     return null;
 }
 
+export async function cacheMeetingMapping(numericId, uuid) {
+    const key = String(numericId);
+    meetingIdToUuid.set(key, uuid);
+    try {
+        await esClient.index({
+            index: 'meetings',
+            id: key,
+            body: {
+                meeting_id: key,
+                meeting_uuid: uuid,
+                start_time: new Date().toISOString(),
+                status: 'active',
+            },
+        });
+        console.log(
+            `📌 Auto-discovered mapping persisted: "${key}" → "${uuid}"`
+        );
+    } catch (err) {
+        console.warn('Failed to persist auto-discovered mapping:', err.message);
+    }
+}
+
 /**
  * Initialize RTMSManager singleton on first use
  */
