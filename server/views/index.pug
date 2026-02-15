@@ -8,10 +8,25 @@ block content
             button.button.is-primary.hidden#toggle-view Toggle View
 
         .content.hidden#immersive
-            h2= participantContexts['user1']
-            h2= participantContexts['user2']
-            h2= participantContexts['user3']
-            h2= participantContexts['user4']
+            .fixed-grid.has-4-cols
+                .grid
+                    .cell
+                        strong#participant-1-name Participant 1
+                    .cell
+                        strong#participant-2-name Participant 2
+                    .cell
+                        strong#participant-3-name Participant 3
+                    .cell
+                        strong#participant-4-name Participant 4
+                    .cell
+                        h4= participantContexts['user1']
+                    .cell
+                        h4= participantContexts['user2']
+                    .cell
+                        h4= participantContexts['user3']
+                    .cell
+                        h4= participantContexts['user4']
+
     else
         +prompt-install(title, installURL)
 

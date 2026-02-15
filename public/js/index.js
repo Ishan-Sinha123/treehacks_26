@@ -9,6 +9,17 @@ const mainContent = document.getElementById('main');
 const toggleButton = document.getElementById('toggle-view');
 const immersiveContainer = document.getElementById('immersive');
 
+const participant1Name = document.getElementById('participant-1-name');
+const participant2Name = document.getElementById('participant-2-name');
+const participant3Name = document.getElementById('participant-3-name');
+const participant4Name = document.getElementById('participant-4-name');
+const participantNames = [
+    participant1Name,
+    participant2Name,
+    participant3Name,
+    participant4Name,
+];
+
 // Initialize app
 (async () => {
     try {
@@ -132,6 +143,8 @@ async function drawParticipants() {
                 height: Math.round(height),
                 zIndex: 1,
             });
+            participantNames[i].textContent =
+                participant.screenName || 'Unknown';
             console.log(
                 `Drew participant: ${
                     participant.screenName || participant.participantUUID
