@@ -89,6 +89,7 @@ async function pollSpeakers() {
 
     try {
         const response = await fetch(`/api/meeting/${meetingId}/speakers`);
+        if (!response.ok) return;
         const data = await response.json();
         const speakers = data.speakers || [];
 
@@ -202,10 +203,14 @@ function startPolling() {
 
         if (runningContext === 'inMeeting') {
             // SIDEBAR MODE
-            await zoomSdk.callZoomApi('startRTMS');
-
             const userContext = await zoomSdk.getUserContext();
             if (userContext.role === 'host') {
+                try {
+                    await zoomSdk.callZoomApi('startRTMS');
+                } catch (rtmsErr) {
+                    console.warn('Failed to start RTMS:', rtmsErr.message);
+                }
+
                 toggleButton.classList.remove('is-hidden');
                 toggleButton.addEventListener('click', toggleImmersiveView);
                 initializeChat();
