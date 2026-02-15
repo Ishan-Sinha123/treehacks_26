@@ -89,14 +89,36 @@ export async function initializeIndices() {
     for (const index of indices) {
         try {
             const exists = await esClient.indices.exists({ index: index.name });
-            if (!exists) {
+            if (exists) {
+                // Check if transcript_chunks has the correct semantic_text mapping
+                if (index.name === 'transcript_chunks') {
+                    const mapping = await esClient.indices.getMapping({
+                        index: index.name,
+                    });
+                    const textType =
+                        mapping[index.name]?.mappings?.properties?.text?.type;
+                    if (textType !== 'semantic_text') {
+                        console.log(
+                            `⚠️  ${index.name} has text type "${textType}" instead of "semantic_text" — recreating`
+                        );
+                        await esClient.indices.delete({ index: index.name });
+                        await esClient.indices.create({
+                            index: index.name,
+                            body: { mappings: index.mappings },
+                        });
+                        console.log(
+                            `✅ Recreated index: ${index.name} with semantic_text`
+                        );
+                        continue;
+                    }
+                }
+                console.log(`ℹ️  Index already exists: ${index.name}`);
+            } else {
                 await esClient.indices.create({
                     index: index.name,
                     body: { mappings: index.mappings },
                 });
                 console.log(`✅ Created index: ${index.name}`);
-            } else {
-                console.log(`ℹ️  Index already exists: ${index.name}`);
             }
         } catch (error) {
             console.error(
@@ -125,28 +147,37 @@ export async function insertTranscriptChunk(chunk) {
     }
 }
 
-// Semantic search — ES auto-embeds the query via jina_embeddings
+// Search transcript chunks — tries semantic search first, falls back to text match
 export async function semanticSearch(query, meetingId, speakerId, size = 10) {
     await indicesReadyPromise;
+
+    const filter = [];
+    if (meetingId) filter.push({ term: { meeting_id: meetingId } });
+    if (speakerId) filter.push({ term: { speaker_ids: speakerId } });
+
+    // Try semantic search first (requires jina_embeddings + semantic_text field)
     try {
         const must = [{ semantic: { field: 'text', query } }];
-        const filter = [];
-        if (meetingId) filter.push({ term: { meeting_id: meetingId } });
-        if (speakerId) filter.push({ term: { speaker_ids: speakerId } });
-
         const body = { query: { bool: { must, filter } }, size };
-
         const result = await esClient.search({
             index: 'transcript_chunks',
             body,
         });
+        return result.hits.hits.map((h) => ({ ...h._source, score: h._score }));
+    } catch {
+        // Fallback to regular text match
+    }
 
-        return result.hits.hits.map((h) => ({
-            ...h._source,
-            score: h._score,
-        }));
+    try {
+        const must = [{ match: { text: query } }];
+        const body = { query: { bool: { must, filter } }, size };
+        const result = await esClient.search({
+            index: 'transcript_chunks',
+            body,
+        });
+        return result.hits.hits.map((h) => ({ ...h._source, score: h._score }));
     } catch (error) {
-        console.error('❌ Error in semantic search:', error);
+        console.error('❌ Error in text search:', error.message);
         throw error;
     }
 }

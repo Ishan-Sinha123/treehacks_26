@@ -17,12 +17,13 @@ export async function start(app, port) {
     const connected = await testConnection();
 
     if (connected) {
+        // Inference endpoints must exist before creating indices
+        // (transcript_chunks needs jina_embeddings for semantic_text field)
+        await setupInferenceEndpoints();
+
         console.log('🔄 Initializing Elasticsearch indices...');
         await initializeIndices();
         console.log('✅ Elasticsearch ready');
-
-        // NEW: Setup inference endpoints
-        await setupInferenceEndpoints();
     } else {
         console.warn(
             '⚠️  Elasticsearch not available - some features will be disabled'
