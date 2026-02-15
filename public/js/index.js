@@ -91,16 +91,25 @@ async function pollSpeakers() {
     }
 
     try {
-        const response = await fetch(`/api/meeting/${meetingId}/speakers`);
+        const url = `/api/meeting/${meetingId}/speakers`;
+        console.log(`[poll] Fetching: ${url}`);
+        const response = await fetch(url);
+        console.log(`[poll] Response status: ${response.status}`);
         const data = await response.json();
+        console.log('[poll] Full response:', JSON.stringify(data, null, 2));
         const speakers = data.speakers || [];
 
         console.log(
-            `[poll] meetingId=${meetingId}, speakers returned:`,
+            `[poll] meetingId=${meetingId}, uuid used=${data.uuid}, speakers returned:`,
             speakers.length
         );
 
-        if (speakers.length === 0) return;
+        if (speakers.length === 0) {
+            console.log(
+                '[poll] No speakers found — uuid mismatch or no data yet'
+            );
+            return;
+        }
 
         // Log what we're trying to match
         const slotNames = participantNames.map((el) => el?.textContent?.trim());
@@ -215,6 +224,10 @@ function startPolling() {
         // Capture meetingId
         try {
             const meetingContext = await zoomSdk.getMeetingContext();
+            console.log(
+                'Full meeting context:',
+                JSON.stringify(meetingContext)
+            );
             meetingId = meetingContext.meetingID || null;
             console.log('Meeting ID:', meetingId);
         } catch (err) {
