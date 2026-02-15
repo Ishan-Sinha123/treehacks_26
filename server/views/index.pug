@@ -9,6 +9,9 @@ block content
 
         .hidden#immersive
             canvas#immersive-canvas
+            p= participantContexts['user1']
+            p= participantContexts['user2']
+            p= participantContexts['user3']
     else
         +prompt-install(title, installURL)
 
