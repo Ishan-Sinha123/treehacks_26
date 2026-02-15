@@ -5,7 +5,7 @@ import {
     semanticSearch,
     esClient,
 } from '../helpers/elasticsearch.js';
-import { getMeetingUuid, cacheMeetingMapping } from './webhook.js';
+import { getMeetingUuid } from './webhook.js';
 
 const router = express.Router();
 
@@ -186,80 +186,23 @@ router.get('/meeting/:meetingId/speakers', async (req, res, next) => {
         sanitize(req);
         const { meetingId } = req.params;
 
-        // Frontend sends numeric meeting ID, ES stores UUID — translate
-        let uuid = await getMeetingUuid(meetingId);
-        let queryId = uuid || meetingId;
-
-        let result;
+        let speakers = [];
         try {
-            result = await esClient.search({
+            const result = await esClient.search({
                 index: 'speaker_context',
                 body: {
-                    query: { term: { meeting_id: queryId } },
+                    query: { match_all: {} },
                     sort: [{ last_updated: 'desc' }],
                     size: 50,
                 },
             });
+            speakers = result.hits.hits.map((hit) => hit._source);
         } catch (searchErr) {
             console.warn('speaker_context search failed:', searchErr.message);
-            return res.json({
-                meeting_id: meetingId,
-                uuid: queryId,
-                speakers: [],
-            });
         }
 
-        let speakers = result.hits.hits.map((hit) => hit._source);
-
-        // Fallback: if UUID lookup found nothing, try to auto-discover
-        // by fetching the most recent speakers from any meeting.
-        // For a single active meeting this bridges the gap when
-        // the meeting.rtms_started webhook fired before our mapping code was deployed.
-        if (speakers.length === 0 && !uuid) {
-            console.log(
-                `🔎 No UUID mapping for "${meetingId}" — trying fallback discovery`
-            );
-            try {
-                const fallback = await esClient.search({
-                    index: 'speaker_context',
-                    body: {
-                        query: { match_all: {} },
-                        sort: [{ last_updated: 'desc' }],
-                        size: 50,
-                    },
-                });
-
-                const fallbackSpeakers = fallback.hits.hits.map(
-                    (h) => h._source
-                );
-
-                if (fallbackSpeakers.length > 0) {
-                    // Learn the mapping from the data — grab the UUID used in the most recent doc
-                    const discoveredUuid = fallbackSpeakers[0].meeting_id;
-                    console.log(
-                        `🔎 Auto-discovered UUID: "${discoveredUuid}" from speaker_context`
-                    );
-
-                    // Cache the mapping for future requests
-                    await cacheMeetingMapping(meetingId, discoveredUuid);
-
-                    // Filter to only speakers from that meeting
-                    speakers = fallbackSpeakers.filter(
-                        (s) => s.meeting_id === discoveredUuid
-                    );
-                    queryId = discoveredUuid;
-                }
-            } catch (fallbackErr) {
-                console.warn(
-                    'Fallback speaker discovery failed:',
-                    fallbackErr.message
-                );
-            }
-        }
-
-        res.json({ meeting_id: meetingId, uuid: queryId, speakers });
+        res.json({ meeting_id: meetingId, speakers });
     } catch (e) {
-        console.error('SPEAKERS REQUEST ERROR:', e.message);
         next(handleError(e));
     }
 });
